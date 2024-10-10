@@ -5,7 +5,7 @@ use naga_oil::compose::{
 };
 #[allow(unused_variables, dead_code)]
 
-fn init_composer() -> Composer {
+fn init_composer<'a>() -> Composer<'a> {
     let mut composer = Composer::default();
 
     let mut load_composable = |source: &str, file_path: &str| {
@@ -102,7 +102,7 @@ fn test_compose_full() -> Result<naga::Module, ComposerError> {
             Ok(module)
         }
         Err(e) => {
-            println!("{}", e.emit_to_string(&composer));
+            println!("{}", e.emit_to_string(&mut composer));
             Err(e)
         }
     }

@@ -1,6 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use indexmap::IndexMap;
+use naga::front::wgsl::parse::{
+    lexer::{Lexer, Token},
+    number::Number,
+};
 use regex::Regex;
 
 use super::{
@@ -9,39 +16,92 @@ use super::{
     ComposerErrorInner, ImportDefWithOffset, ShaderDefValue,
 };
 
-#[derive(Debug)]
-pub struct Preprocessor {
-    version_regex: Regex,
-    ifdef_regex: Regex,
-    ifndef_regex: Regex,
-    ifop_regex: Regex,
-    else_regex: Regex,
-    endif_regex: Regex,
-    def_regex: Regex,
-    def_regex_delimited: Regex,
-    import_regex: Regex,
-    define_import_path_regex: Regex,
-    define_shader_def_regex: Regex,
+struct TokenDisplay<'a>(pub Token<'a>);
+impl ToString for TokenDisplay<'_> {
+    fn to_string(&self) -> String {
+        match self.0 {
+            Token::Separator(c) | Token::Paren(c) | Token::Unknown(c) => format!("character `{c}`"),
+            Token::Attribute => "attribute".into(),
+            Token::Number(_) => "number".into(),
+            Token::Word(w) => format!("word `{w}`"),
+            Token::Operation(o)
+            | Token::LogicalOperation(o)
+            | Token::ShiftOperation(o)
+            | Token::AssignmentOperation(o) => format!("operator `{o}`"),
+            Token::IncrementOperation => "operator `++`".into(),
+            Token::DecrementOperation => "operator `--`".into(),
+            Token::Arrow => "arrow".into(),
+            Token::Trivia => "comment".into(),
+            Token::End => "end of file".into(),
+        }
+    }
 }
 
-impl Default for Preprocessor {
+enum ShaderDefIfOp {
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Ne,
+    Eq,
+}
+
+impl ToString for ShaderDefIfOp {
+    fn to_string(&self) -> String {
+        match self {
+            ShaderDefIfOp::Gt => ">",
+            ShaderDefIfOp::Gte => ">=",
+            ShaderDefIfOp::Lt => "<",
+            ShaderDefIfOp::Lte => "<=",
+            ShaderDefIfOp::Ne => "!=",
+            ShaderDefIfOp::Eq => "==",
+        }
+        .into()
+    }
+}
+
+#[derive(Debug)]
+pub struct Preprocessor<'a> {
+    // version_regex: Regex,
+    // ifdef_regex: Regex,
+    // ifndef_regex: Regex,
+    // ifop_regex: Regex,
+    // else_regex: Regex,
+    // endif_regex: Regex,
+    // def_regex: Regex,
+    // def_regex_delimited: Regex,
+    // import_regex: Regex,
+    // define_import_path_regex: Regex,
+    // define_shader_def_regex: Regex,
+    // TODO: remove if uneeded
+    _p: std::marker::PhantomData<&'a ()>,
+    // lexer: Lexer<'a>,
+}
+
+impl Default for Preprocessor<'_> {
     fn default() -> Self {
         Self {
-            version_regex: Regex::new(r"^\s*#version\s+([0-9]+)").unwrap(),
-            ifdef_regex: Regex::new(r"^\s*#\s*(else\s+)?\s*ifdef\s+([\w|\d|_]+)").unwrap(),
-            ifndef_regex: Regex::new(r"^\s*#\s*(else\s+)?\s*ifndef\s+([\w|\d|_]+)").unwrap(),
-            ifop_regex: Regex::new(
-                r"^\s*#\s*(else\s+)?\s*if\s+([\w|\d|_]+)\s*([=!<>]*)\s*([-\w|\d]+)",
-            )
-            .unwrap(),
-            else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
-            endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
-            def_regex: Regex::new(r"#\s*([\w|\d|_]+)").unwrap(),
-            def_regex_delimited: Regex::new(r"#\s*\{([\w|\d|_]+)\}").unwrap(),
-            import_regex: Regex::new(r"^\s*#\s*import\s").unwrap(),
-            define_import_path_regex: Regex::new(r"^\s*#\s*define_import_path\s+([^\s]+)").unwrap(),
-            define_shader_def_regex: Regex::new(r"^\s*#\s*define\s+([\w|\d|_]+)\s*([-\w|\d]+)?")
-                .unwrap(),
+            // version_regex: Regex::new(r"^\s*#version\s+([0-9]+)").unwrap(),
+            // ifdef_regex: Regex::new(r"^\s*#\s*(else\s+)?\s*ifdef\s+([\w|\d|_]+)").unwrap(),
+            // ifndef_regex: Regex::new(r"^\s*#\s*(else\s+)?\s*ifndef\s+([\w|\d|_]+)").unwrap(),
+            // ifop_regex: Regex::new(
+            //     r"^\s*#\s*(else\s+)?\s*if\s+([\w|\d|_]+)\s*([=!<>]*)\s*([-\w|\d]+)",
+            // )
+            // .unwrap(),
+            // else_regex: Regex::new(r"^\s*#\s*else").unwrap(),
+            // endif_regex: Regex::new(r"^\s*#\s*endif").unwrap(),
+            // def_regex: Regex::new(r"#\s*([\w|\d|_]+)").unwrap(),
+            // def_regex_delimited: Regex::new(r"#\s*\{([\w|\d|_]+)\}").unwrap(),
+            // import_regex: Regex::new(r"^\s*#\s*import\s").unwrap(),
+            // define_import_path_regex: Regex::new(r"^\s*#\s*define_import_path\s+([^\s]+)").unwrap(),
+            // define_shader_def_regex: Regex::new(r"^\s*#\s*define\s+([\w|\d|_]+)\s*([-\w|\d]+)?")
+            //     .unwrap(),
+
+            // constructing the lexer is very cheap so i think this should be okay
+            // i didnt want to wrap it in an option because that would cause downstream
+            // code to be worse
+            // lexer: Lexer::new(""),
+            _p: std::marker::PhantomData,
         }
     }
 }
@@ -132,94 +192,149 @@ pub struct PreprocessOutput {
     pub imports: Vec<ImportDefWithOffset>,
 }
 
-impl Preprocessor {
-    fn check_scope<'a>(
+impl<'p> Preprocessor<'p> {
+    fn check_scope(
         &self,
         shader_defs: &HashMap<String, ShaderDefValue>,
-        line: &'a str,
+        mut lexer: Lexer<'p>,
         scope: Option<&mut Scope>,
         offset: usize,
-    ) -> Result<(bool, Option<&'a str>), ComposerErrorInner> {
-        if let Some(cap) = self.ifdef_regex.captures(line) {
-            let is_else = cap.get(1).is_some();
-            let def = cap.get(2).unwrap().as_str();
-            let cond = shader_defs.contains_key(def);
-            scope.map_or(Ok(()), |scope| scope.branch(is_else, cond, offset))?;
-            return Ok((true, Some(def)));
-        } else if let Some(cap) = self.ifndef_regex.captures(line) {
-            let is_else = cap.get(1).is_some();
-            let def = cap.get(2).unwrap().as_str();
-            let cond = !shader_defs.contains_key(def);
-            scope.map_or(Ok(()), |scope| scope.branch(is_else, cond, offset))?;
-            return Ok((true, Some(def)));
-        } else if let Some(cap) = self.ifop_regex.captures(line) {
-            let is_else = cap.get(1).is_some();
-            let def = cap.get(2).unwrap().as_str();
-            let op = cap.get(3).unwrap();
-            let val = cap.get(4).unwrap();
+    ) -> Result<(bool, Option<&'p str>), ComposerErrorInner> {
+        let is_else = lexer.skip(Token::Word("else"));
 
-            if scope.is_none() {
-                // don't try to evaluate if we don't have a scope
+        let get_def = |lexer: &mut Lexer<'p>| -> Result<&'p str, ComposerErrorInner> {
+            match lexer.next() {
+                (Token::Word(def), ..) => Ok(def),
+                tok => {
+                    return Err(ComposerErrorInner::ExpectedTokenInShaderDef {
+                        pos: offset,
+                        expected: "definition name".into(),
+                        found: TokenDisplay(tok.0).to_string(),
+                    })
+                }
+            }
+        };
+
+        match (is_else, lexer.next()) {
+            // either `is_else` will be true, `else` will have been skipped and therefore the following token is `ifdef`
+            // or `is_else` will be false, no token will have been skippd and therefore the next token is `ifdef`
+            (_, (Token::Word("ifdef"), ..)) => {
+                let def = get_def(&mut lexer)?;
+                let cond = shader_defs.contains_key(def);
+                scope.map_or(Ok(()), |scope| scope.branch(is_else, cond, offset))?;
                 return Ok((true, Some(def)));
             }
-
-            fn act_on<T: Eq + Ord>(
-                a: T,
-                b: T,
-                op: &str,
-                pos: usize,
-            ) -> Result<bool, ComposerErrorInner> {
-                match op {
-                    "==" => Ok(a == b),
-                    "!=" => Ok(a != b),
-                    ">" => Ok(a > b),
-                    ">=" => Ok(a >= b),
-                    "<" => Ok(a < b),
-                    "<=" => Ok(a <= b),
-                    _ => Err(ComposerErrorInner::UnknownShaderDefOperator {
-                        pos,
-                        operator: op.to_string(),
-                    }),
-                }
+            (_, (Token::Word("ifndef"), ..)) => {
+                let def = get_def(&mut lexer)?;
+                let cond = !shader_defs.contains_key(def);
+                scope.map_or(Ok(()), |scope| scope.branch(is_else, cond, offset))?;
+                return Ok((true, Some(def)));
             }
+            (_, (Token::Word("if"), ..)) => {
+                let def = get_def(&mut lexer)?;
+                let op = match lexer.next() {
+                    // logical operation includes && and || which we dont want
+                    (Token::LogicalOperation('='), ..) => ShaderDefIfOp::Eq,
+                    (Token::LogicalOperation('!'), ..) => ShaderDefIfOp::Ne,
+                    (Token::LogicalOperation('<'), ..) => ShaderDefIfOp::Lte,
+                    (Token::LogicalOperation('>'), ..) => ShaderDefIfOp::Gte,
+                    (Token::Paren('<'), ..) => ShaderDefIfOp::Lt,
+                    (Token::Paren('>'), ..) => ShaderDefIfOp::Gt,
+                    tok => {
+                        return Err(ComposerErrorInner::ExpectedTokenInShaderDef {
+                            pos: offset,
+                            expected: "comparison operator".into(),
+                            found: TokenDisplay(tok.0).to_string(),
+                        })
+                    }
+                };
 
-            let def_value = shader_defs
-                .get(def)
-                .ok_or(ComposerErrorInner::UnknownShaderDef {
+                let val = match lexer.next() {
+                    (Token::Word("true"), ..) => "true".into(),
+                    (Token::Word("false"), ..) => "false".into(),
+                    (Token::Number(num), ..) => match num {
+                        Ok(Number::I32(n)) => n.to_string(),
+                        Ok(Number::U32(n)) => n.to_string(),
+                        Ok(Number::I64(n)) => n.to_string(),
+                        Ok(Number::U64(n)) => n.to_string(),
+                        Ok(..) => {
+                            return Err(ComposerErrorInner::InvalidNumberInDefComparison(offset))
+                        }
+                        Err(e) => return Err(ComposerErrorInner::WglsNumberError(offset, e)),
+                    },
+
+                    tok => {
+                        return Err(ComposerErrorInner::ExpectedTokenInShaderDef {
+                            pos: offset,
+                            expected: "bool/int/uint".into(),
+                            found: TokenDisplay(tok.0).to_string(),
+                        })
+                    }
+                };
+
+                let invalid_def = |ty: &str| ComposerErrorInner::InvalidShaderDefComparisonValue {
                     pos: offset,
                     shader_def_name: def.to_string(),
-                })?;
+                    value: val.as_str().to_string(),
+                    expected: ty.to_string(),
+                };
 
-            let invalid_def = |ty: &str| ComposerErrorInner::InvalidShaderDefComparisonValue {
-                pos: offset,
-                shader_def_name: def.to_string(),
-                value: val.as_str().to_string(),
-                expected: ty.to_string(),
-            };
+                let def_value =
+                    shader_defs
+                        .get(def)
+                        .ok_or(ComposerErrorInner::UnknownShaderDef {
+                            pos: offset,
+                            shader_def_name: def.to_string(),
+                        })?;
 
-            let new_scope = match def_value {
-                ShaderDefValue::Bool(def_value) => {
-                    let val = val.as_str().parse().map_err(|_| invalid_def("bool"))?;
-                    act_on(*def_value, val, op.as_str(), offset)?
+                fn act_on<T: Eq + Ord>(
+                    a: T,
+                    b: T,
+                    op: ShaderDefIfOp,
+                    pos: usize,
+                ) -> Result<bool, ComposerErrorInner> {
+                    match op {
+                        ShaderDefIfOp::Eq => Ok(a == b),
+                        ShaderDefIfOp::Ne => Ok(a != b),
+                        ShaderDefIfOp::Gt => Ok(a > b),
+                        ShaderDefIfOp::Gte => Ok(a >= b),
+                        ShaderDefIfOp::Lt => Ok(a < b),
+                        ShaderDefIfOp::Lte => Ok(a <= b),
+                        _ => Err(ComposerErrorInner::UnknownShaderDefOperator {
+                            pos,
+                            operator: op.to_string(),
+                        }),
+                    }
                 }
-                ShaderDefValue::Int(def_value) => {
-                    let val = val.as_str().parse().map_err(|_| invalid_def("int"))?;
-                    act_on(*def_value, val, op.as_str(), offset)?
-                }
-                ShaderDefValue::UInt(def_value) => {
-                    let val = val.as_str().parse().map_err(|_| invalid_def("uint"))?;
-                    act_on(*def_value, val, op.as_str(), offset)?
-                }
-            };
 
-            scope.map_or(Ok(()), |scope| scope.branch(is_else, new_scope, offset))?;
-            return Ok((true, Some(def)));
-        } else if self.else_regex.is_match(line) {
-            scope.map_or(Ok(()), |scope| scope.branch(true, true, offset))?;
-            return Ok((true, None));
-        } else if self.endif_regex.is_match(line) {
-            scope.map_or(Ok(()), |scope| scope.pop(offset))?;
-            return Ok((true, None));
+                let new_scope = match def_value {
+                    ShaderDefValue::Bool(def_value) => {
+                        let val = val.as_str().parse().map_err(|_| invalid_def("bool"))?;
+                        act_on(*def_value, val, op, offset)?
+                    }
+                    ShaderDefValue::Int(def_value) => {
+                        let val = val.as_str().parse().map_err(|_| invalid_def("int"))?;
+                        act_on(*def_value, val, op, offset)?
+                    }
+                    ShaderDefValue::UInt(def_value) => {
+                        let val = val.as_str().parse().map_err(|_| invalid_def("uint"))?;
+                        act_on(*def_value, val, op, offset)?
+                    }
+                };
+
+                scope.map_or(Ok(()), |scope| scope.branch(is_else, new_scope, offset))?;
+                return Ok((true, Some(def)));
+            }
+            // else case
+            (true, ..) => {
+                scope.map_or(Ok(()), |scope| scope.branch(true, true, offset))?;
+                return Ok((true, None));
+            }
+            (false, (Token::Word("endif"), ..)) => {
+                scope.map_or(Ok(()), |scope| scope.pop(offset))?;
+                return Ok((true, None));
+            }
+            _ => (),
         }
 
         Ok((false, None))
@@ -230,16 +345,17 @@ impl Preprocessor {
     // also strip "#version xxx"
     // replace items with resolved decorated names
     pub fn preprocess(
-        &self,
+        &mut self,
         shader_str: &str,
         shader_defs: &HashMap<String, ShaderDefValue>,
     ) -> Result<PreprocessOutput, ComposerErrorInner> {
-        let mut declared_imports = IndexMap::new();
-        let mut used_imports = IndexMap::new();
+        // let mut declared_imports = IndexMap::new();
+        // let mut used_imports = IndexMap::new();
         let mut scope = Scope::new();
         let mut final_string = String::new();
         let mut offset = 0;
 
+        /*
         // this code broadly stolen from bevy_render::ShaderProcessor
         let mut lines = shader_str.lines();
         let mut lines = lines.replace_comments().zip(shader_str.lines()).peekable();
@@ -367,117 +483,169 @@ impl Preprocessor {
 
         scope.finish(offset)?;
 
-        Ok(PreprocessOutput {
-            preprocessed_source: final_string,
-            imports: used_imports.into_values().collect(),
-        })
+        */
+
+        todo!();
+        // Ok(PreprocessOutput {
+        //     preprocessed_source: final_string,
+        //     imports: used_imports.into_values().collect(),
+        // })
     }
 
     // extract module name and all possible imports
     pub fn get_preprocessor_metadata(
-        &self,
+        &mut self,
         shader_str: &str,
         allow_defines: bool,
     ) -> Result<PreprocessorMetaData, ComposerErrorInner> {
-        let mut declared_imports = IndexMap::default();
-        let mut used_imports = IndexMap::default();
-        let mut name = None;
+        // TODO(dexterhill0): does the lexer even need to be on `self`?
+        let mut lexer = Lexer::new(shader_str);
+
+        // let mut declared_imports = IndexMap::default();
+        // let mut used_imports = IndexMap::default();
+        // let mut name = None;
         let mut offset = 0;
-        let mut defines = HashMap::default();
-        let mut effective_defs = HashSet::default();
+        // let mut defines = HashMap::default();
+        // let mut effective_defs = HashSet::default();
 
-        let mut lines = shader_str.lines();
-        let mut lines = lines.replace_comments().peekable();
+        // TODO(dexterhill0):
+        // - VERSIONS
+        // - #<define> (#DEF / #{DEF})
+        // - #ifdef, ifop, ifndef, else, endif
+        // - #import
+        // - #define_import_path
+        // - #define (shader define)
 
-        while let Some(mut line) = lines.next() {
-            let (is_scope, def) = self.check_scope(&HashMap::default(), &line, None, offset)?;
+        loop {
+            let (token, token_span) = lexer.next();
 
-            if is_scope {
-                if let Some(def) = def {
-                    effective_defs.insert(def.to_owned());
-                }
-            } else if self.import_regex.is_match(&line) {
-                let mut import_lines = String::default();
-                let mut open_count = 0;
-                let initial_offset = offset;
-
-                loop {
-                    // PERF: Ideally we don't do multiple `match_indices` passes over `line`
-                    // in addition to the final pass for the import parse
-                    open_count += line.match_indices('{').count();
-                    open_count = open_count.saturating_sub(line.match_indices('}').count());
-
-                    // PERF: it's bad that we allocate here. ideally we would use something like
-                    //     let import_lines = &shader_str[initial_offset..offset]
-                    // but we need the comments removed, and the iterator approach doesn't make that easy
-                    import_lines.push_str(&line);
-                    import_lines.push('\n');
-
-                    if open_count == 0 || lines.peek().is_none() {
-                        break;
-                    }
-
-                    // output spaces for removed lines to keep spans consistent (errors report against substituted_source, which is not preprocessed)
-                    offset += line.len() + 1;
-
-                    line = lines.next().unwrap();
-                }
-
-                parse_imports(import_lines.as_str(), &mut declared_imports).map_err(
-                    |(err, line_offset)| {
-                        ComposerErrorInner::ImportParseError(
-                            err.to_owned(),
-                            initial_offset + line_offset,
-                        )
-                    },
-                )?;
-            } else if let Some(cap) = self.define_import_path_regex.captures(&line) {
-                name = Some(cap.get(1).unwrap().as_str().to_string());
-            } else if let Some(cap) = self.define_shader_def_regex.captures(&line) {
-                if allow_defines {
-                    let def = cap.get(1).unwrap();
-                    let name = def.as_str().to_string();
-
-                    let value = if let Some(val) = cap.get(2) {
-                        if let Ok(val) = val.as_str().parse::<u32>() {
-                            ShaderDefValue::UInt(val)
-                        } else if let Ok(val) = val.as_str().parse::<i32>() {
-                            ShaderDefValue::Int(val)
-                        } else if let Ok(val) = val.as_str().parse::<bool>() {
-                            ShaderDefValue::Bool(val)
-                        } else {
-                            ShaderDefValue::Bool(false) // this error will get picked up when we fully preprocess the module
-                        }
-                    } else {
-                        ShaderDefValue::Bool(true)
-                    };
-
-                    defines.insert(name, value);
-                } else {
-                    return Err(ComposerErrorInner::DefineInModule(offset));
-                }
-            } else {
-                for cap in self
-                    .def_regex
-                    .captures_iter(&line)
-                    .chain(self.def_regex_delimited.captures_iter(&line))
-                {
-                    effective_defs.insert(cap.get(1).unwrap().as_str().to_owned());
-                }
-
-                substitute_identifiers(&line, offset, &declared_imports, &mut used_imports, true)
-                    .unwrap();
+            if token == Token::End {
+                break;
             }
 
-            offset += line.len() + 1;
+            // this can be changed in the future if need be
+            if !matches!(token, Token::Unknown('#')) {
+                continue;
+            }
+
+            let (is_scope, def) =
+                self.check_scope(&HashMap::default(), lexer.clone(), None, offset)?;
+
+            // naga lexer doesnt count '#' as a valid character
+            // but luckily for us it still stores it as an "unkown" token
+            // personally i think `@` would work better but that would be a breaking change
+            match lexer.peek() {
+                (Token::Word("version"), directive_span) => {
+                    // TODO: version
+                }
+                (Token::Word("import"), directive_span) => {
+                    // TODO: import
+                }
+                (Token::Word("define_import_path"), directive_span) => {
+                    // TODO: define_import_path
+                }
+                (Token::Word("define"), directive_span) => {
+                    // TODO: define
+                }
+
+                _ => continue,
+            }
         }
 
-        Ok(PreprocessorMetaData {
-            name,
-            imports: used_imports.into_values().collect(),
-            defines,
-            effective_defs,
-        })
+        // let mut lines = shader_str.lines();
+        // let mut lines = lines.replace_comments().peekable();
+
+        // while let Some(mut line) = lines.next() {
+        //     let (is_scope, def) = self.check_scope(&HashMap::default(), &line, None, offset)?;
+
+        //     if is_scope {
+        //         if let Some(def) = def {
+        //             effective_defs.insert(def.to_owned());
+        //         }
+        //     } else if self.import_regex.is_match(&line) {
+        //         let mut import_lines = String::default();
+        //         let mut open_count = 0;
+        //         let initial_offset = offset;
+
+        //         loop {
+        //             // PERF: Ideally we don't do multiple `match_indices` passes over `line`
+        //             // in addition to the final pass for the import parse
+        //             open_count += line.match_indices('{').count();
+        //             open_count = open_count.saturating_sub(line.match_indices('}').count());
+
+        //             // PERF: it's bad that we allocate here. ideally we would use something like
+        //             //     let import_lines = &shader_str[initial_offset..offset]
+        //             // but we need the comments removed, and the iterator approach doesn't make that easy
+        //             import_lines.push_str(&line);
+        //             import_lines.push('\n');
+
+        //             if open_count == 0 || lines.peek().is_none() {
+        //                 break;
+        //             }
+
+        //             // output spaces for removed lines to keep spans consistent (errors report against substituted_source, which is not preprocessed)
+        //             offset += line.len() + 1;
+
+        //             line = lines.next().unwrap();
+        //         }
+
+        //         parse_imports(import_lines.as_str(), &mut declared_imports).map_err(
+        //             |(err, line_offset)| {
+        //                 ComposerErrorInner::ImportParseError(
+        //                     err.to_owned(),
+        //                     initial_offset + line_offset,
+        //                 )
+        //             },
+        //         )?;
+        //     } else if let Some(cap) = self.define_import_path_regex.captures(&line) {
+        //         name = Some(cap.get(1).unwrap().as_str().to_string());
+        //     } else if let Some(cap) = self.define_shader_def_regex.captures(&line) {
+        //         if allow_defines {
+        //             let def = cap.get(1).unwrap();
+        //             let name = def.as_str().to_string();
+
+        //             let value = if let Some(val) = cap.get(2) {
+        //                 if let Ok(val) = val.as_str().parse::<u32>() {
+        //                     ShaderDefValue::UInt(val)
+        //                 } else if let Ok(val) = val.as_str().parse::<i32>() {
+        //                     ShaderDefValue::Int(val)
+        //                 } else if let Ok(val) = val.as_str().parse::<bool>() {
+        //                     ShaderDefValue::Bool(val)
+        //                 } else {
+        //                     ShaderDefValue::Bool(false) // this error will get picked up when we fully preprocess the module
+        //                 }
+        //             } else {
+        //                 ShaderDefValue::Bool(true)
+        //             };
+
+        //             defines.insert(name, value);
+        //         } else {
+        //             return Err(ComposerErrorInner::DefineInModule(offset));
+        //         }
+        //     } else {
+        //         for cap in self
+        //             .def_regex
+        //             .captures_iter(&line)
+        //             .chain(self.def_regex_delimited.captures_iter(&line))
+        //         {
+        //             effective_defs.insert(cap.get(1).unwrap().as_str().to_owned());
+        //         }
+
+        //         substitute_identifiers(&line, offset, &declared_imports, &mut used_imports, true)
+        //             .unwrap();
+        //     }
+
+        //     offset += line.len() + 1;
+        // }
+
+        todo!()
+
+        // Ok(PreprocessorMetaData {
+        //     name,
+        //     imports: used_imports.into_values().collect(),
+        //     defines,
+        //     effective_defs,
+        // })
     }
 }
 
@@ -559,7 +727,7 @@ fn vertex(
 }
 ";
 
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
 
         let result_missing = processor.preprocess(
             WGSL,
@@ -659,7 +827,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result_eq = processor
             .preprocess(
                 WGSL,
@@ -793,7 +961,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result_eq = processor
             .preprocess(
                 WGSL,
@@ -896,7 +1064,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result_eq = processor
             .preprocess(
                 WGSL,
@@ -1000,7 +1168,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(
                 WGSL,
@@ -1032,7 +1200,7 @@ defined
 defined
       
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let PreprocessorMetaData {
             defines: shader_defs,
             ..
@@ -1075,7 +1243,7 @@ int: -1
 bool: false   
       
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let PreprocessorMetaData {
             defines: shader_defs,
             ..
@@ -1112,7 +1280,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor.preprocess(&WGSL_ELSE_IFDEF, &[].into()).unwrap();
         assert_eq!(
             result
@@ -1188,7 +1356,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(&WGSL_ELSE_IFDEF_NO_ELSE_FALLBACK, &[].into())
             .unwrap();
@@ -1236,7 +1404,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(
                 &WGSL_ELSE_IFDEF,
@@ -1284,7 +1452,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(
                 &WGSL_ELSE_IFDEF,
@@ -1332,7 +1500,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(
                 &WGSL_ELSE_IFDEF,
@@ -1380,7 +1548,7 @@ fn vertex(
     return out;
 }
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(
                 &WGSL_ELSE_IFDEF,
@@ -1438,7 +1606,7 @@ fn vertex(
 // should be here
 // defined 2
 ";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(
                 &WGSL_COMPLICATED_ELSE_IFDEF,
@@ -1474,7 +1642,7 @@ fail 3
 ";
 
         const EXPECTED: &str = r"ok";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor.preprocess(&INPUT, &[].into()).unwrap();
         assert_eq!(
             result
@@ -1505,7 +1673,7 @@ fail 3
 ";
 
         const EXPECTED: &str = r"ok";
-        let processor = Preprocessor::default();
+        let mut processor = Preprocessor::default();
         let result = processor
             .preprocess(&INPUT, &[("x".to_owned(), ShaderDefValue::Int(2))].into())
             .unwrap();

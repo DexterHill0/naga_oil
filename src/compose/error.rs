@@ -6,6 +6,7 @@ use codespan_reporting::{
     term,
     term::termcolor::WriteColor,
 };
+use naga::front::wgsl::error::NumberError;
 use thiserror::Error;
 use tracing::trace;
 
@@ -27,14 +28,18 @@ pub enum ErrSource {
 }
 
 impl ErrSource {
-    pub fn path<'a>(&'a self, composer: &'a Composer) -> &'a String {
+    pub fn path<'a>(&'a self, composer: &'a mut Composer) -> String {
+        // NOTE(dexterhill0): composer needs to be mut now in order to replace the lexer so this can no longer return `&'a String`
+        // instead i clone but the alternative may be wrapping the lexer in RefCell - this seemed better to me
         match self {
-            ErrSource::Module { name, .. } => &composer.module_sets.get(name).unwrap().file_path,
-            ErrSource::Constructing { path, .. } => path,
+            ErrSource::Module { name, .. } => {
+                composer.module_sets.get(name).unwrap().file_path.clone()
+            }
+            ErrSource::Constructing { path, .. } => path.to_owned(),
         }
     }
 
-    pub fn source<'a>(&'a self, composer: &'a Composer) -> Cow<'a, String> {
+    pub fn source<'a>(&'a self, composer: &'a mut Composer) -> Cow<'a, String> {
         match self {
             ErrSource::Module { name, defs, .. } => {
                 let raw_source = &composer.module_sets.get(name).unwrap().sanitized_source;
@@ -108,6 +113,19 @@ pub enum ComposerErrorInner {
         expected: String,
         value: String,
     },
+
+    // NOTE(dexterhill0) i'm adding these errors but if theres a better way exist to do this/they already exist let me know
+    #[error("unexpected token in shader def. expected {expected} name, found {found}")]
+    ExpectedTokenInShaderDef {
+        pos: usize,
+        expected: String,
+        found: String,
+    },
+    #[error("invalid number type in def comparison. allowed types are i32/u32/i64/u64")]
+    InvalidNumberInDefComparison(usize),
+    #[error("{0}")]
+    WglsNumberError(usize, NumberError),
+
     #[error("multiple inconsistent shader def values: '{def}'")]
     InconsistentShaderDefValue { def: String },
     #[error("Attempted to add a module with no #define_import_path")]
@@ -162,12 +180,12 @@ impl<'a> Iterator for ErrorSources<'a> {
 
 impl ComposerError {
     /// format a Composer error
-    pub fn emit_to_string(&self, composer: &Composer) -> String {
+    pub fn emit_to_string(&self, composer: &mut Composer) -> String {
         todo!();
         // composer.undecorate(&self.emit_to_string_internal(composer))
     }
 
-    fn emit_to_string_internal(&self, composer: &Composer) -> String {
+    fn emit_to_string_internal(&self, composer: &mut Composer) -> String {
         let path = self.source.path(composer);
         let source = self.source.source(composer);
         let source_offset = self.source.offset();
@@ -180,7 +198,7 @@ impl ComposerError {
                 ..((rng.end & ((1 << SPAN_SHIFT) - 1)).saturating_sub(source_offset))
         };
 
-        let files = SimpleFile::new(path, source.as_str());
+        let files = SimpleFile::new(&path, source.as_str());
         let config = term::Config::default();
         let (labels, notes) = match &self.inner {
             ComposerErrorInner::DecorationInSource(range) => {
@@ -231,7 +249,8 @@ impl ComposerError {
                     .collect(),
                 vec![],
             ),
-            ComposerErrorInner::NotEnoughEndIfs(pos)
+            ComposerErrorInner::InvalidNumberInDefComparison(pos)
+            | ComposerErrorInner::NotEnoughEndIfs(pos)
             | ComposerErrorInner::TooManyEndIfs(pos)
             | ComposerErrorInner::ElseWithoutCondition(pos)
             | ComposerErrorInner::UnknownShaderDef { pos, .. }
@@ -266,6 +285,20 @@ impl ComposerError {
                 vec![Label::primary((), map_span(at.to_range().unwrap_or(0..0)))
                     .with_message(self.inner.to_string())],
                 vec![],
+            ),
+            ComposerErrorInner::ExpectedTokenInShaderDef {
+                pos,
+                expected,
+                found,
+            } => (
+                vec![Label::primary((), *pos..*pos)],
+                vec![format!(
+                    "in shader def: expected token {expected}, found {found}"
+                )],
+            ),
+            ComposerErrorInner::WglsNumberError(pos, number_error) => (
+                vec![Label::primary((), *pos..*pos)],
+                vec![format!("{number_error}")],
             ),
         };
 

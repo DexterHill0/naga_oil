@@ -129,7 +129,10 @@ use indexmap::IndexMap;
 ///
 use naga::EntryPoint;
 use regex::Regex;
-use std::collections::{hash_map::Entry, BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    fmt::Debug,
+};
 use tracing::{debug, trace};
 
 use crate::{
@@ -179,8 +182,9 @@ impl From<ShaderType> for ShaderLanguage {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum ShaderDefValue {
     Bool(bool),
-    Int(i32),
-    UInt(u32),
+    // NOTE(dexterhill0) any reason these were 32 bit numbers?
+    Int(i64),
+    UInt(u64),
 }
 
 impl Default for ShaderDefValue {
@@ -313,13 +317,12 @@ pub struct ImportDefWithOffset {
 /// module composer.
 /// stores any modules that can be imported into a shader
 /// and builds the final shader
-#[derive(Debug)]
-pub struct Composer {
+pub struct Composer<'a> {
     pub validate: bool,
     pub module_sets: HashMap<String, ComposableModuleDefinition>,
     pub module_index: HashMap<usize, String>,
     pub capabilities: naga::valid::Capabilities,
-    preprocessor: Preprocessor,
+    preprocessor: Preprocessor<'a>,
     // check_decoration_regex: Regex,
     // undecorate_regex: Regex,
     // virtual_fn_regex: Regex,
@@ -329,13 +332,24 @@ pub struct Composer {
     // auto_binding_index: u32,
 }
 
+impl Debug for Composer<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Composer")
+            .field("validate", &self.validate)
+            .field("module_sets", &self.module_sets)
+            .field("module_index", &self.module_index)
+            .field("capabilities", &self.capabilities)
+            .finish()
+    }
+}
+
 // shift for module index
 // 21 gives
 //   max size for shader of 2m characters
 //   max 2048 modules
 const SPAN_SHIFT: usize = 21;
 
-impl Default for Composer {
+impl Default for Composer<'_> {
     fn default() -> Self {
         Self {
             validate: true,
@@ -401,7 +415,7 @@ struct IrBuildResult {
     override_functions: IndexMap<String, Vec<String>>,
 }
 
-impl Composer {
+impl Composer<'_> {
     pub fn decorated_name(module_name: Option<&str>, item_name: &str) -> String {
         match module_name {
             Some(module_name) => format!("{}{}", item_name, Self::decorate(module_name)),
@@ -1402,7 +1416,7 @@ pub struct NagaModuleDescriptor<'a> {
 }
 
 // public api
-impl Composer {
+impl Composer<'_> {
     /// create a non-validating composer.
     /// validation errors in the final shader will not be caught, and errors resulting from their
     /// use will have bad span data, so codespan reporting will fail.
@@ -1840,8 +1854,8 @@ impl Composer {
     }
 }
 
-static PREPROCESSOR: once_cell::sync::Lazy<Preprocessor> =
-    once_cell::sync::Lazy::new(Preprocessor::default);
+static PREPROCESSOR: once_cell::sync::Lazy<std::sync::RwLock<Preprocessor>> =
+    once_cell::sync::Lazy::new(std::sync::RwLock::default);
 
 /// Get module name and all required imports (ignoring shader_defs) from a shader string
 pub fn get_preprocessor_data(
@@ -1856,7 +1870,10 @@ pub fn get_preprocessor_data(
         imports,
         defines,
         ..
-    }) = PREPROCESSOR.get_preprocessor_metadata(source, true)
+    }) = PREPROCESSOR
+        .write()
+        .expect("preprocessor already locked")
+        .get_preprocessor_metadata(source, true)
     {
         (
             name,

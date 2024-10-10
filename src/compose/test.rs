@@ -163,7 +163,7 @@ mod test {
                 })
                 .err()
                 .unwrap();
-            let text = error.emit_to_string(&composer);
+            let text = error.emit_to_string(&mut composer);
 
             // println!("{}", text);
             // let mut f = std::fs::File::create("err_validation_1.txt").unwrap();
@@ -191,7 +191,7 @@ mod test {
                 .err()
                 .unwrap();
 
-            let text = error.emit_to_string(&composer);
+            let text = error.emit_to_string(&mut composer);
 
             // println!("{}", text);
             // let mut f = std::fs::File::create("err_validation_2.txt").unwrap();
@@ -215,7 +215,7 @@ mod test {
                 })
                 .err()
                 .unwrap();
-            let text = error.emit_to_string(&composer);
+            let text = error.emit_to_string(&mut composer);
 
             // println!("{}", text);
             // let mut f = std::fs::File::create("err_parse.txt").unwrap();
@@ -242,7 +242,7 @@ mod test {
                 })
                 .err()
                 .unwrap();
-            let text2 = error_2.emit_to_string(&composer);
+            let text2 = error_2.emit_to_string(&mut composer);
             output_eq!(text2, "tests/expected/err_parse.txt");
         }
     }
@@ -259,7 +259,7 @@ mod test {
             })
             .err()
             .unwrap();
-        let text = error.emit_to_string(&composer);
+        let text = error.emit_to_string(&mut composer);
         // let mut f = std::fs::File::create("missing_import.txt").unwrap();
         // f.write_all(text.as_bytes()).unwrap();
         // drop(f);
@@ -278,7 +278,7 @@ mod test {
             })
             .err()
             .unwrap();
-        let text = error.emit_to_string(&composer);
+        let text = error.emit_to_string(&mut composer);
         // let mut f = std::fs::File::create("missing_import.txt").unwrap();
         // f.write_all(text.as_bytes()).unwrap();
         // drop(f);
@@ -1337,7 +1337,7 @@ mod test {
                 }),
             ),
             module: &shader_module,
-            entry_point: "run_test",
+            entry_point: Some("run_test"),
             compilation_options: Default::default(),
             cache: None,
         });
@@ -1359,7 +1359,7 @@ mod test {
         });
 
         pass.set_pipeline(&pipeline);
-        pass.set_bind_group(0, &bindgroup, &[]);
+        pass.set_bind_group(0, Some(&bindgroup), &[]);
         pass.dispatch_workgroups(1, 1, 1);
 
         drop(pass);
