@@ -160,18 +160,18 @@ pub enum ShaderLanguage {
 pub enum ShaderType {
     #[default]
     Wgsl,
-    #[cfg(feature = "glsl")]
-    GlslVertex,
-    #[cfg(feature = "glsl")]
-    GlslFragment,
+    // #[cfg(feature = "glsl")]
+    // GlslVertex,
+    // #[cfg(feature = "glsl")]
+    // GlslFragment,
 }
 
 impl From<ShaderType> for ShaderLanguage {
     fn from(ty: ShaderType) -> Self {
         match ty {
             ShaderType::Wgsl => ShaderLanguage::Wgsl,
-            #[cfg(feature = "glsl")]
-            ShaderType::GlslVertex | ShaderType::GlslFragment => ShaderLanguage::Glsl,
+            // #[cfg(feature = "glsl")]
+            // ShaderType::GlslVertex | ShaderType::GlslFragment => ShaderLanguage::Glsl,
         }
     }
 }
@@ -320,13 +320,13 @@ pub struct Composer {
     pub module_index: HashMap<usize, String>,
     pub capabilities: naga::valid::Capabilities,
     preprocessor: Preprocessor,
-    check_decoration_regex: Regex,
-    undecorate_regex: Regex,
-    virtual_fn_regex: Regex,
-    override_fn_regex: Regex,
-    undecorate_override_regex: Regex,
-    auto_binding_regex: Regex,
-    auto_binding_index: u32,
+    // check_decoration_regex: Regex,
+    // undecorate_regex: Regex,
+    // virtual_fn_regex: Regex,
+    // override_fn_regex: Regex,
+    // undecorate_override_regex: Regex,
+    // auto_binding_regex: Regex,
+    // auto_binding_index: u32,
 }
 
 // shift for module index
@@ -343,48 +343,48 @@ impl Default for Composer {
             module_sets: Default::default(),
             module_index: Default::default(),
             preprocessor: Preprocessor::default(),
-            check_decoration_regex: Regex::new(
-                format!(
-                    "({}|{})",
-                    regex_syntax::escape(DECORATION_PRE),
-                    regex_syntax::escape(DECORATION_OVERRIDE_PRE)
-                )
-                .as_str(),
-            )
-            .unwrap(),
-            undecorate_regex: Regex::new(
-                format!(
-                    r"(\x1B\[\d+\w)?([\w\d_]+){}([A-Z0-9]*){}",
-                    regex_syntax::escape(DECORATION_PRE),
-                    regex_syntax::escape(DECORATION_POST)
-                )
-                .as_str(),
-            )
-            .unwrap(),
-            virtual_fn_regex: Regex::new(
-                r"(?P<lead>[\s]*virtual\s+fn\s+)(?P<function>[^\s]+)(?P<trail>\s*)\(",
-            )
-            .unwrap(),
-            override_fn_regex: Regex::new(
-                format!(
-                    r"(override\s+fn\s+)([^\s]+){}([\w\d]+){}(\s*)\(",
-                    regex_syntax::escape(DECORATION_PRE),
-                    regex_syntax::escape(DECORATION_POST)
-                )
-                .as_str(),
-            )
-            .unwrap(),
-            undecorate_override_regex: Regex::new(
-                format!(
-                    "{}([A-Z0-9]*){}",
-                    regex_syntax::escape(DECORATION_OVERRIDE_PRE),
-                    regex_syntax::escape(DECORATION_POST)
-                )
-                .as_str(),
-            )
-            .unwrap(),
-            auto_binding_regex: Regex::new(r"@binding\(auto\)").unwrap(),
-            auto_binding_index: 0,
+            // check_decoration_regex: Regex::new(
+            //     format!(
+            //         "({}|{})",
+            //         regex_syntax::escape(DECORATION_PRE),
+            //         regex_syntax::escape(DECORATION_OVERRIDE_PRE)
+            //     )
+            //     .as_str(),
+            // )
+            // .unwrap(),
+            // undecorate_regex: Regex::new(
+            //     format!(
+            //         r"(\x1B\[\d+\w)?([\w\d_]+){}([A-Z0-9]*){}",
+            //         regex_syntax::escape(DECORATION_PRE),
+            //         regex_syntax::escape(DECORATION_POST)
+            //     )
+            //     .as_str(),
+            // )
+            // .unwrap(),
+            // virtual_fn_regex: Regex::new(
+            //     r"(?P<lead>[\s]*virtual\s+fn\s+)(?P<function>[^\s]+)(?P<trail>\s*)\(",
+            // )
+            // .unwrap(),
+            // override_fn_regex: Regex::new(
+            //     format!(
+            //         r"(override\s+fn\s+)([^\s]+){}([\w\d]+){}(\s*)\(",
+            //         regex_syntax::escape(DECORATION_PRE),
+            //         regex_syntax::escape(DECORATION_POST)
+            //     )
+            //     .as_str(),
+            // )
+            // .unwrap(),
+            // undecorate_override_regex: Regex::new(
+            //     format!(
+            //         "{}([A-Z0-9]*){}",
+            //         regex_syntax::escape(DECORATION_OVERRIDE_PRE),
+            //         regex_syntax::escape(DECORATION_POST)
+            //     )
+            //     .as_str(),
+            // )
+            // .unwrap(),
+            // auto_binding_regex: Regex::new(r"@binding\(auto\)").unwrap(),
+            // auto_binding_index: 0,
         }
     }
 }
@@ -423,56 +423,56 @@ impl Composer {
         naga::valid::Validator::new(naga::valid::ValidationFlags::all(), self.capabilities)
     }
 
-    fn undecorate(&self, string: &str) -> String {
-        let undecor = self
-            .undecorate_regex
-            .replace_all(string, |caps: &regex::Captures| {
-                format!(
-                    "{}{}::{}",
-                    caps.get(1).map(|cc| cc.as_str()).unwrap_or(""),
-                    Self::decode(caps.get(3).unwrap().as_str()),
-                    caps.get(2).unwrap().as_str()
-                )
-            });
+    // fn undecorate(&self, string: &str) -> String {
+    //     let undecor = self
+    //         .undecorate_regex
+    //         .replace_all(string, |caps: &regex::Captures| {
+    //             format!(
+    //                 "{}{}::{}",
+    //                 caps.get(1).map(|cc| cc.as_str()).unwrap_or(""),
+    //                 Self::decode(caps.get(3).unwrap().as_str()),
+    //                 caps.get(2).unwrap().as_str()
+    //             )
+    //         });
 
-        let undecor =
-            self.undecorate_override_regex
-                .replace_all(&undecor, |caps: &regex::Captures| {
-                    format!(
-                        "override fn {}::",
-                        Self::decode(caps.get(1).unwrap().as_str())
-                    )
-                });
+    //     let undecor =
+    //         self.undecorate_override_regex
+    //             .replace_all(&undecor, |caps: &regex::Captures| {
+    //                 format!(
+    //                     "override fn {}::",
+    //                     Self::decode(caps.get(1).unwrap().as_str())
+    //                 )
+    //             });
 
-        undecor.to_string()
-    }
+    //     undecor.to_string()
+    // }
 
-    fn sanitize_and_set_auto_bindings(&mut self, source: &str) -> String {
-        let mut substituted_source = source.replace("\r\n", "\n").replace('\r', "\n");
-        if !substituted_source.ends_with('\n') {
-            substituted_source.push('\n');
+    fn sanitize_source(&mut self, source: &str) -> String {
+        let mut sanitized_source = source.replace("\r\n", "\n").replace('\r', "\n");
+        if !sanitized_source.ends_with('\n') {
+            sanitized_source.push('\n');
         }
 
-        // replace @binding(auto) with an incrementing index
-        struct AutoBindingReplacer<'a> {
-            auto: &'a mut u32,
-        }
+        // // replace @binding(auto) with an incrementing index
+        // struct AutoBindingReplacer<'a> {
+        //     auto: &'a mut u32,
+        // }
 
-        impl<'a> regex::Replacer for AutoBindingReplacer<'a> {
-            fn replace_append(&mut self, _: &regex::Captures<'_>, dst: &mut String) {
-                dst.push_str(&format!("@binding({})", self.auto));
-                *self.auto += 1;
-            }
-        }
+        // impl<'a> regex::Replacer for AutoBindingReplacer<'a> {
+        //     fn replace_append(&mut self, _: &regex::Captures<'_>, dst: &mut String) {
+        //         dst.push_str(&format!("@binding({})", self.auto));
+        //         *self.auto += 1;
+        //     }
+        // }
 
-        let substituted_source = self.auto_binding_regex.replace_all(
-            &substituted_source,
-            AutoBindingReplacer {
-                auto: &mut self.auto_binding_index,
-            },
-        );
+        // let sanitized_source = self.auto_binding_regex.replace_all(
+        //     &sanitized_source,
+        //     AutoBindingReplacer {
+        //         auto: &mut self.auto_binding_index,
+        //     },
+        // );
 
-        substituted_source.into_owned()
+        sanitized_source.to_owned()
     }
 
     fn naga_to_string(
@@ -841,366 +841,367 @@ impl Composer {
         source: &str,
         imports: Vec<ImportDefWithOffset>,
     ) -> Result<ComposableModule, ComposerError> {
-        let mut imports: Vec<_> = imports
-            .into_iter()
-            .map(|import_with_offset| import_with_offset.definition)
-            .collect();
-        imports.extend(module_definition.additional_imports.to_vec());
+        // let mut imports: Vec<_> = imports
+        //     .into_iter()
+        //     .map(|import_with_offset| import_with_offset.definition)
+        //     .collect();
+        // imports.extend(module_definition.additional_imports.to_vec());
 
-        trace!(
-            "create composable module {}: source len {}",
-            module_definition.name,
-            source.len()
-        );
+        // trace!(
+        //     "create composable module {}: source len {}",
+        //     module_definition.name,
+        //     source.len()
+        // );
 
-        // record virtual/overridable functions
-        let mut virtual_functions: HashSet<String> = Default::default();
-        let source = self
-            .virtual_fn_regex
-            .replace_all(source, |cap: &regex::Captures| {
-                let target_function = cap.get(2).unwrap().as_str().to_owned();
+        // // record virtual/overridable functions
+        // let mut virtual_functions: HashSet<String> = Default::default();
+        // let source = self
+        //     .virtual_fn_regex
+        //     .replace_all(source, |cap: &regex::Captures| {
+        //         let target_function = cap.get(2).unwrap().as_str().to_owned();
 
-                let replacement_str = format!(
-                    "{}fn {}{}(",
-                    " ".repeat(cap.get(1).unwrap().range().len() - 3),
-                    target_function,
-                    " ".repeat(cap.get(3).unwrap().range().len()),
-                );
+        //         let replacement_str = format!(
+        //             "{}fn {}{}(",
+        //             " ".repeat(cap.get(1).unwrap().range().len() - 3),
+        //             target_function,
+        //             " ".repeat(cap.get(3).unwrap().range().len()),
+        //         );
 
-                virtual_functions.insert(target_function);
+        //         virtual_functions.insert(target_function);
 
-                replacement_str
-            });
+        //         replacement_str
+        //     });
 
-        // record and rename override functions
-        let mut local_override_functions: IndexMap<String, String> = Default::default();
+        // // record and rename override functions
+        // let mut local_override_functions: IndexMap<String, String> = Default::default();
 
-        #[cfg(not(feature = "override_any"))]
-        let mut override_error = None;
+        // #[cfg(not(feature = "override_any"))]
+        // let mut override_error = None;
 
-        let source =
-            self.override_fn_regex
-                .replace_all(&source, |cap: &regex::Captures| {
-                    let target_module = cap.get(3).unwrap().as_str().to_owned();
-                    let target_function = cap.get(2).unwrap().as_str().to_owned();
+        // let source =
+        //     self.override_fn_regex
+        //         .replace_all(&source, |cap: &regex::Captures| {
+        //             let target_module = cap.get(3).unwrap().as_str().to_owned();
+        //             let target_function = cap.get(2).unwrap().as_str().to_owned();
 
-                    #[cfg(not(feature = "override_any"))]
-                    {
-                        let wrap_err = |inner: ComposerErrorInner| -> ComposerError {
-                            ComposerError {
-                                inner,
-                                source: ErrSource::Module {
-                                    name: module_definition.name.to_owned(),
-                                    offset: 0,
-                                    defs: shader_defs.clone(),
-                                },
-                            }
-                        };
+        //             #[cfg(not(feature = "override_any"))]
+        //             {
+        //                 let wrap_err = |inner: ComposerErrorInner| -> ComposerError {
+        //                     ComposerError {
+        //                         inner,
+        //                         source: ErrSource::Module {
+        //                             name: module_definition.name.to_owned(),
+        //                             offset: 0,
+        //                             defs: shader_defs.clone(),
+        //                         },
+        //                     }
+        //                 };
 
-                        // ensure overrides are applied to virtual functions
-                        let raw_module_name = Self::decode(&target_module);
-                        let module_set = self.module_sets.get(&raw_module_name);
+        //                 // ensure overrides are applied to virtual functions
+        //                 let raw_module_name = Self::decode(&target_module);
+        //                 let module_set = self.module_sets.get(&raw_module_name);
 
-                        match module_set {
-                            None => {
-                                // TODO this should be unreachable?
-                                let pos = cap.get(3).unwrap().start();
-                                override_error = Some(wrap_err(
-                                    ComposerErrorInner::ImportNotFound(raw_module_name, pos),
-                                ));
-                            }
-                            Some(module_set) => {
-                                let module = module_set.get_module(shader_defs).unwrap();
-                                if !module.virtual_functions.contains(&target_function) {
-                                    let pos = cap.get(2).unwrap().start();
-                                    override_error =
-                                        Some(wrap_err(ComposerErrorInner::OverrideNotVirtual {
-                                            name: target_function.clone(),
-                                            pos,
-                                        }));
-                                }
-                            }
-                        }
-                    }
+        //                 match module_set {
+        //                     None => {
+        //                         // TODO this should be unreachable?
+        //                         let pos = cap.get(3).unwrap().start();
+        //                         override_error = Some(wrap_err(
+        //                             ComposerErrorInner::ImportNotFound(raw_module_name, pos),
+        //                         ));
+        //                     }
+        //                     Some(module_set) => {
+        //                         let module = module_set.get_module(shader_defs).unwrap();
+        //                         if !module.virtual_functions.contains(&target_function) {
+        //                             let pos = cap.get(2).unwrap().start();
+        //                             override_error =
+        //                                 Some(wrap_err(ComposerErrorInner::OverrideNotVirtual {
+        //                                     name: target_function.clone(),
+        //                                     pos,
+        //                                 }));
+        //                         }
+        //                     }
+        //                 }
+        //             }
 
-                    let base_name = format!(
-                        "{}{}{}{}",
-                        target_function.as_str(),
-                        DECORATION_PRE,
-                        target_module.as_str(),
-                        DECORATION_POST,
-                    );
-                    let rename = format!(
-                        "{}{}{}{}",
-                        target_function.as_str(),
-                        DECORATION_OVERRIDE_PRE,
-                        target_module.as_str(),
-                        DECORATION_POST,
-                    );
+        //             let base_name = format!(
+        //                 "{}{}{}{}",
+        //                 target_function.as_str(),
+        //                 DECORATION_PRE,
+        //                 target_module.as_str(),
+        //                 DECORATION_POST,
+        //             );
+        //             let rename = format!(
+        //                 "{}{}{}{}",
+        //                 target_function.as_str(),
+        //                 DECORATION_OVERRIDE_PRE,
+        //                 target_module.as_str(),
+        //                 DECORATION_POST,
+        //             );
 
-                    let replacement_str = format!(
-                        "{}fn {}{}(",
-                        " ".repeat(cap.get(1).unwrap().range().len() - 3),
-                        rename,
-                        " ".repeat(cap.get(4).unwrap().range().len()),
-                    );
+        //             let replacement_str = format!(
+        //                 "{}fn {}{}(",
+        //                 " ".repeat(cap.get(1).unwrap().range().len() - 3),
+        //                 rename,
+        //                 " ".repeat(cap.get(4).unwrap().range().len()),
+        //             );
 
-                    local_override_functions.insert(rename, base_name);
+        //             local_override_functions.insert(rename, base_name);
 
-                    replacement_str
-                })
-                .to_string();
+        //             replacement_str
+        //         })
+        //         .to_string();
 
-        #[cfg(not(feature = "override_any"))]
-        if let Some(err) = override_error {
-            return Err(err);
-        }
+        // #[cfg(not(feature = "override_any"))]
+        // if let Some(err) = override_error {
+        //     return Err(err);
+        // }
 
-        trace!("local overrides: {:?}", local_override_functions);
-        trace!(
-            "create composable module {}: source len {}",
-            module_definition.name,
-            source.len()
-        );
+        // trace!("local overrides: {:?}", local_override_functions);
+        // trace!(
+        //     "create composable module {}: source len {}",
+        //     module_definition.name,
+        //     source.len()
+        // );
 
-        let IrBuildResult {
-            module: mut source_ir,
-            start_offset,
-            mut override_functions,
-        } = self.create_module_ir(
-            &module_definition.name,
-            source,
-            module_definition.language,
-            &imports,
-            shader_defs,
-        )?;
+        // let IrBuildResult {
+        //     module: mut source_ir,
+        //     start_offset,
+        //     mut override_functions,
+        // } = self.create_module_ir(
+        //     &module_definition.name,
+        //     source,
+        //     module_definition.language,
+        //     &imports,
+        //     shader_defs,
+        // )?;
 
-        // from here on errors need to be reported using the modified source with start_offset
-        let wrap_err = |inner: ComposerErrorInner| -> ComposerError {
-            ComposerError {
-                inner,
-                source: ErrSource::Module {
-                    name: module_definition.name.to_owned(),
-                    offset: start_offset,
-                    defs: shader_defs.clone(),
-                },
-            }
-        };
+        // // from here on errors need to be reported using the modified source with start_offset
+        // let wrap_err = |inner: ComposerErrorInner| -> ComposerError {
+        //     ComposerError {
+        //         inner,
+        //         source: ErrSource::Module {
+        //             name: module_definition.name.to_owned(),
+        //             offset: start_offset,
+        //             defs: shader_defs.clone(),
+        //         },
+        //     }
+        // };
 
-        // add our local override to the total set of overrides for the given function
-        for (rename, base_name) in &local_override_functions {
-            override_functions
-                .entry(base_name.clone())
-                .or_default()
-                .push(format!("{rename}{module_decoration}"));
-        }
+        // // add our local override to the total set of overrides for the given function
+        // for (rename, base_name) in &local_override_functions {
+        //     override_functions
+        //         .entry(base_name.clone())
+        //         .or_default()
+        //         .push(format!("{rename}{module_decoration}"));
+        // }
 
-        // rename and record owned items (except types which can't be mutably accessed)
-        let mut owned_constants = IndexMap::new();
-        for (h, c) in source_ir.constants.iter_mut() {
-            if let Some(name) = c.name.as_mut() {
-                if !name.contains(DECORATION_PRE) {
-                    *name = format!("{name}{module_decoration}");
-                    owned_constants.insert(name.clone(), h);
-                }
-            }
-        }
+        // // rename and record owned items (except types which can't be mutably accessed)
+        // let mut owned_constants = IndexMap::new();
+        // for (h, c) in source_ir.constants.iter_mut() {
+        //     if let Some(name) = c.name.as_mut() {
+        //         if !name.contains(DECORATION_PRE) {
+        //             *name = format!("{name}{module_decoration}");
+        //             owned_constants.insert(name.clone(), h);
+        //         }
+        //     }
+        // }
 
-        // These are naga/wgpu's pipeline override constants, not naga_oil's overrides
-        let mut owned_pipeline_overrides = IndexMap::new();
-        for (h, po) in source_ir.overrides.iter_mut() {
-            if let Some(name) = po.name.as_mut() {
-                if !name.contains(DECORATION_PRE) {
-                    *name = format!("{name}{module_decoration}");
-                    owned_pipeline_overrides.insert(name.clone(), h);
-                }
-            }
-        }
+        // // These are naga/wgpu's pipeline override constants, not naga_oil's overrides
+        // let mut owned_pipeline_overrides = IndexMap::new();
+        // for (h, po) in source_ir.overrides.iter_mut() {
+        //     if let Some(name) = po.name.as_mut() {
+        //         if !name.contains(DECORATION_PRE) {
+        //             *name = format!("{name}{module_decoration}");
+        //             owned_pipeline_overrides.insert(name.clone(), h);
+        //         }
+        //     }
+        // }
 
-        let mut owned_vars = IndexMap::new();
-        for (h, gv) in source_ir.global_variables.iter_mut() {
-            if let Some(name) = gv.name.as_mut() {
-                if !name.contains(DECORATION_PRE) {
-                    *name = format!("{name}{module_decoration}");
+        // let mut owned_vars = IndexMap::new();
+        // for (h, gv) in source_ir.global_variables.iter_mut() {
+        //     if let Some(name) = gv.name.as_mut() {
+        //         if !name.contains(DECORATION_PRE) {
+        //             *name = format!("{name}{module_decoration}");
 
-                    owned_vars.insert(name.clone(), h);
-                }
-            }
-        }
+        //             owned_vars.insert(name.clone(), h);
+        //         }
+        //     }
+        // }
 
-        let mut owned_functions = IndexMap::new();
-        for (h_f, f) in source_ir.functions.iter_mut() {
-            if let Some(name) = f.name.as_mut() {
-                if !name.contains(DECORATION_PRE) {
-                    *name = format!("{name}{module_decoration}");
+        // let mut owned_functions = IndexMap::new();
+        // for (h_f, f) in source_ir.functions.iter_mut() {
+        //     if let Some(name) = f.name.as_mut() {
+        //         if !name.contains(DECORATION_PRE) {
+        //             *name = format!("{name}{module_decoration}");
 
-                    // create dummy header function
-                    let header_function = naga::Function {
-                        name: Some(name.clone()),
-                        arguments: f.arguments.to_vec(),
-                        result: f.result.clone(),
-                        local_variables: Default::default(),
-                        expressions: Default::default(),
-                        named_expressions: Default::default(),
-                        body: Default::default(),
-                    };
+        //             // create dummy header function
+        //             let header_function = naga::Function {
+        //                 name: Some(name.clone()),
+        //                 arguments: f.arguments.to_vec(),
+        //                 result: f.result.clone(),
+        //                 local_variables: Default::default(),
+        //                 expressions: Default::default(),
+        //                 named_expressions: Default::default(),
+        //                 body: Default::default(),
+        //             };
 
-                    // record owned function
-                    owned_functions.insert(name.clone(), (Some(h_f), header_function));
-                }
-            }
-        }
+        //             // record owned function
+        //             owned_functions.insert(name.clone(), (Some(h_f), header_function));
+        //         }
+        //     }
+        // }
 
-        if demote_entrypoints {
-            // make normal functions out of the source entry points
-            for ep in &mut source_ir.entry_points {
-                ep.function.name = Some(format!(
-                    "{}{}",
-                    ep.function.name.as_deref().unwrap_or("main"),
-                    module_decoration,
-                ));
-                let header_function = naga::Function {
-                    name: ep.function.name.clone(),
-                    arguments: ep
-                        .function
-                        .arguments
-                        .iter()
-                        .cloned()
-                        .map(|arg| naga::FunctionArgument {
-                            name: arg.name,
-                            ty: arg.ty,
-                            binding: None,
-                        })
-                        .collect(),
-                    result: ep.function.result.clone().map(|res| naga::FunctionResult {
-                        ty: res.ty,
-                        binding: None,
-                    }),
-                    local_variables: Default::default(),
-                    expressions: Default::default(),
-                    named_expressions: Default::default(),
-                    body: Default::default(),
-                };
+        // if demote_entrypoints {
+        //     // make normal functions out of the source entry points
+        //     for ep in &mut source_ir.entry_points {
+        //         ep.function.name = Some(format!(
+        //             "{}{}",
+        //             ep.function.name.as_deref().unwrap_or("main"),
+        //             module_decoration,
+        //         ));
+        //         let header_function = naga::Function {
+        //             name: ep.function.name.clone(),
+        //             arguments: ep
+        //                 .function
+        //                 .arguments
+        //                 .iter()
+        //                 .cloned()
+        //                 .map(|arg| naga::FunctionArgument {
+        //                     name: arg.name,
+        //                     ty: arg.ty,
+        //                     binding: None,
+        //                 })
+        //                 .collect(),
+        //             result: ep.function.result.clone().map(|res| naga::FunctionResult {
+        //                 ty: res.ty,
+        //                 binding: None,
+        //             }),
+        //             local_variables: Default::default(),
+        //             expressions: Default::default(),
+        //             named_expressions: Default::default(),
+        //             body: Default::default(),
+        //         };
 
-                owned_functions.insert(ep.function.name.clone().unwrap(), (None, header_function));
-            }
-        };
+        //         owned_functions.insert(ep.function.name.clone().unwrap(), (None, header_function));
+        //     }
+        // };
 
-        let mut module_builder = DerivedModule::default();
-        let mut header_builder = DerivedModule::default();
-        module_builder.set_shader_source(&source_ir, 0);
-        header_builder.set_shader_source(&source_ir, 0);
+        // let mut module_builder = DerivedModule::default();
+        // let mut header_builder = DerivedModule::default();
+        // module_builder.set_shader_source(&source_ir, 0);
+        // header_builder.set_shader_source(&source_ir, 0);
 
-        let mut owned_types = HashSet::new();
-        for (h, ty) in source_ir.types.iter() {
-            if let Some(name) = &ty.name {
-                // we need to exclude autogenerated struct names, i.e. those that begin with "__"
-                // "__" is a reserved prefix for naga so user variables cannot use it.
-                if !name.contains(DECORATION_PRE) && !name.starts_with("__") {
-                    let name = format!("{name}{module_decoration}");
-                    owned_types.insert(name.clone());
-                    // copy and rename types
-                    module_builder.rename_type(&h, Some(name.clone()));
-                    header_builder.rename_type(&h, Some(name));
-                    continue;
-                }
-            }
+        // let mut owned_types = HashSet::new();
+        // for (h, ty) in source_ir.types.iter() {
+        //     if let Some(name) = &ty.name {
+        //         // we need to exclude autogenerated struct names, i.e. those that begin with "__"
+        //         // "__" is a reserved prefix for naga so user variables cannot use it.
+        //         if !name.contains(DECORATION_PRE) && !name.starts_with("__") {
+        //             let name = format!("{name}{module_decoration}");
+        //             owned_types.insert(name.clone());
+        //             // copy and rename types
+        //             module_builder.rename_type(&h, Some(name.clone()));
+        //             header_builder.rename_type(&h, Some(name));
+        //             continue;
+        //         }
+        //     }
 
-            // copy all required types
-            module_builder.import_type(&h);
-        }
+        //     // copy all required types
+        //     module_builder.import_type(&h);
+        // }
 
-        // copy owned types into header and module
-        for h in owned_constants.values() {
-            header_builder.import_const(h);
-            module_builder.import_const(h);
-        }
+        // // copy owned types into header and module
+        // for h in owned_constants.values() {
+        //     header_builder.import_const(h);
+        //     module_builder.import_const(h);
+        // }
 
-        for h in owned_pipeline_overrides.values() {
-            header_builder.import_pipeline_override(h);
-            module_builder.import_pipeline_override(h);
-        }
+        // for h in owned_pipeline_overrides.values() {
+        //     header_builder.import_pipeline_override(h);
+        //     module_builder.import_pipeline_override(h);
+        // }
 
-        for h in owned_vars.values() {
-            header_builder.import_global(h);
-            module_builder.import_global(h);
-        }
+        // for h in owned_vars.values() {
+        //     header_builder.import_global(h);
+        //     module_builder.import_global(h);
+        // }
 
-        // only stubs of owned functions into the header
-        for (h_f, f) in owned_functions.values() {
-            let span = h_f
-                .map(|h_f| source_ir.functions.get_span(h_f))
-                .unwrap_or(naga::Span::UNDEFINED);
-            header_builder.import_function(f, span); // header stub function
-        }
-        // all functions into the module (note source_ir only contains stubs for imported functions)
-        for (h_f, f) in source_ir.functions.iter() {
-            let span = source_ir.functions.get_span(h_f);
-            module_builder.import_function(f, span);
-        }
-        // // including entry points as vanilla functions if required
-        if demote_entrypoints {
-            for ep in &source_ir.entry_points {
-                let mut f = ep.function.clone();
-                f.arguments = f
-                    .arguments
-                    .into_iter()
-                    .map(|arg| naga::FunctionArgument {
-                        name: arg.name,
-                        ty: arg.ty,
-                        binding: None,
-                    })
-                    .collect();
-                f.result = f.result.map(|res| naga::FunctionResult {
-                    ty: res.ty,
-                    binding: None,
-                });
+        // // only stubs of owned functions into the header
+        // for (h_f, f) in owned_functions.values() {
+        //     let span = h_f
+        //         .map(|h_f| source_ir.functions.get_span(h_f))
+        //         .unwrap_or(naga::Span::UNDEFINED);
+        //     header_builder.import_function(f, span); // header stub function
+        // }
+        // // all functions into the module (note source_ir only contains stubs for imported functions)
+        // for (h_f, f) in source_ir.functions.iter() {
+        //     let span = source_ir.functions.get_span(h_f);
+        //     module_builder.import_function(f, span);
+        // }
+        // // // including entry points as vanilla functions if required
+        // if demote_entrypoints {
+        //     for ep in &source_ir.entry_points {
+        //         let mut f = ep.function.clone();
+        //         f.arguments = f
+        //             .arguments
+        //             .into_iter()
+        //             .map(|arg| naga::FunctionArgument {
+        //                 name: arg.name,
+        //                 ty: arg.ty,
+        //                 binding: None,
+        //             })
+        //             .collect();
+        //         f.result = f.result.map(|res| naga::FunctionResult {
+        //             ty: res.ty,
+        //             binding: None,
+        //         });
 
-                module_builder.import_function(&f, naga::Span::UNDEFINED);
-                // todo figure out how to get span info for entrypoints
-            }
-        }
+        //         module_builder.import_function(&f, naga::Span::UNDEFINED);
+        //         // todo figure out how to get span info for entrypoints
+        //     }
+        // }
 
-        let module_ir = module_builder.into_module_with_entrypoints();
-        let mut header_ir: naga::Module = header_builder.into();
+        // let module_ir = module_builder.into_module_with_entrypoints();
+        // let mut header_ir: naga::Module = header_builder.into();
 
-        if self.validate && create_headers {
-            // check that identifiers haven't been renamed
-            #[allow(clippy::single_element_loop)]
-            for language in [
-                ShaderLanguage::Wgsl,
-                #[cfg(feature = "glsl")]
-                ShaderLanguage::Glsl,
-            ] {
-                let header = self
-                    .naga_to_string(&mut header_ir, language, &module_definition.name)
-                    .map_err(wrap_err)?;
-                Self::validate_identifiers(
-                    &source_ir,
-                    language,
-                    &header,
-                    &module_decoration,
-                    &owned_types,
-                )
-                .map_err(wrap_err)?;
-            }
-        }
+        // if self.validate && create_headers {
+        //     // check that identifiers haven't been renamed
+        //     #[allow(clippy::single_element_loop)]
+        //     for language in [
+        //         ShaderLanguage::Wgsl,
+        //         #[cfg(feature = "glsl")]
+        //         ShaderLanguage::Glsl,
+        //     ] {
+        //         let header = self
+        //             .naga_to_string(&mut header_ir, language, &module_definition.name)
+        //             .map_err(wrap_err)?;
+        //         Self::validate_identifiers(
+        //             &source_ir,
+        //             language,
+        //             &header,
+        //             &module_decoration,
+        //             &owned_types,
+        //         )
+        //         .map_err(wrap_err)?;
+        //     }
+        // }
 
-        let composable_module = ComposableModule {
-            decorated_name: module_decoration,
-            imports,
-            owned_types,
-            owned_constants: owned_constants.into_keys().collect(),
-            owned_vars: owned_vars.into_keys().collect(),
-            owned_functions: owned_functions.into_keys().collect(),
-            virtual_functions,
-            override_functions,
-            module_ir,
-            header_ir,
-            start_offset,
-        };
+        // let composable_module = ComposableModule {
+        //     decorated_name: module_decoration,
+        //     imports,
+        //     owned_types,
+        //     owned_constants: owned_constants.into_keys().collect(),
+        //     owned_vars: owned_vars.into_keys().collect(),
+        //     owned_functions: owned_functions.into_keys().collect(),
+        //     virtual_functions,
+        //     override_functions,
+        //     module_ir,
+        //     header_ir,
+        //     start_offset,
+        // };
 
-        Ok(composable_module)
+        // Ok(composable_module)
+        todo!()
     }
 
     // shunt all data owned by a composable into a derived module
@@ -1445,10 +1446,13 @@ impl Composer {
             mut shader_defs,
         } = desc;
 
-        // reject a module containing the DECORATION strings
-        if let Some(decor) = self.check_decoration_regex.find(source) {
+        // TODO: is this a good solution? i dont think we should construct the lexer just for this check
+        // maybe the regex is still a better solution?
+        // reject a module containing the decoration comment
+        let decor_range = 2..DECORATION_PRE.len();
+        if &source[decor_range.clone()] == DECORATION_PRE {
             return Err(ComposerError {
-                inner: ComposerErrorInner::DecorationInSource(decor.range()),
+                inner: ComposerErrorInner::DecorationInSource(decor_range),
                 source: ErrSource::Constructing {
                     path: file_path.to_owned(),
                     source: source.to_owned(),
@@ -1457,8 +1461,9 @@ impl Composer {
             });
         }
 
-        let substituted_source = self.sanitize_and_set_auto_bindings(source);
+        let sanitized_source = self.sanitize_source(source);
 
+        // TODO: auto bindings
         let PreprocessorMetaData {
             name: module_name,
             mut imports,
@@ -1466,7 +1471,7 @@ impl Composer {
             ..
         } = self
             .preprocessor
-            .get_preprocessor_metadata(&substituted_source, false)
+            .get_preprocessor_metadata(&sanitized_source, false)
             .map_err(|inner| ComposerError {
                 inner,
                 source: ErrSource::Constructing {
@@ -1475,87 +1480,90 @@ impl Composer {
                     offset: 0,
                 },
             })?;
-        let module_name = as_name.or(module_name);
-        if module_name.is_none() {
-            return Err(ComposerError {
-                inner: ComposerErrorInner::NoModuleName,
-                source: ErrSource::Constructing {
-                    path: file_path.to_owned(),
-                    source: source.to_owned(),
-                    offset: 0,
-                },
-            });
-        }
-        let module_name = module_name.unwrap();
 
-        debug!(
-            "adding module definition for {} with defs: {:?}",
-            module_name, shader_defs
-        );
+        // let module_name = as_name.or(module_name);
+        // if module_name.is_none() {
+        //     return Err(ComposerError {
+        //         inner: ComposerErrorInner::NoModuleName,
+        //         source: ErrSource::Constructing {
+        //             path: file_path.to_owned(),
+        //             source: source.to_owned(),
+        //             offset: 0,
+        //         },
+        //     });
+        // }
+        // let module_name = module_name.unwrap();
 
-        // add custom imports
-        let additional_imports = additional_imports.to_vec();
-        imports.extend(
-            additional_imports
-                .iter()
-                .cloned()
-                .map(|def| ImportDefWithOffset {
-                    definition: def,
-                    offset: 0,
-                }),
-        );
+        // debug!(
+        //     "adding module definition for {} with defs: {:?}",
+        //     module_name, shader_defs
+        // );
 
-        for import in &imports {
-            // we require modules already added so that we can capture the shader_defs that may impact us by impacting our dependencies
-            let module_set = self
-                .module_sets
-                .get(&import.definition.import)
-                .ok_or_else(|| ComposerError {
-                    inner: ComposerErrorInner::ImportNotFound(
-                        import.definition.import.clone(),
-                        import.offset,
-                    ),
-                    source: ErrSource::Constructing {
-                        path: file_path.to_owned(),
-                        source: substituted_source.to_owned(),
-                        offset: 0,
-                    },
-                })?;
-            effective_defs.extend(module_set.effective_defs.iter().cloned());
-            shader_defs.extend(
-                module_set
-                    .shader_defs
-                    .iter()
-                    .map(|def| (def.0.clone(), *def.1)),
-            );
-        }
+        // // add custom imports
+        // let additional_imports = additional_imports.to_vec();
+        // imports.extend(
+        //     additional_imports
+        //         .iter()
+        //         .cloned()
+        //         .map(|def| ImportDefWithOffset {
+        //             definition: def,
+        //             offset: 0,
+        //         }),
+        // );
 
-        // remove defs that are already specified through our imports
-        effective_defs.retain(|name| !shader_defs.contains_key(name));
+        // for import in &imports {
+        //     // we require modules already added so that we can capture the shader_defs that may impact us by impacting our dependencies
+        //     let module_set = self
+        //         .module_sets
+        //         .get(&import.definition.import)
+        //         .ok_or_else(|| ComposerError {
+        //             inner: ComposerErrorInner::ImportNotFound(
+        //                 import.definition.import.clone(),
+        //                 import.offset,
+        //             ),
+        //             source: ErrSource::Constructing {
+        //                 path: file_path.to_owned(),
+        //                 source: substituted_source.to_owned(),
+        //                 offset: 0,
+        //             },
+        //         })?;
+        //     effective_defs.extend(module_set.effective_defs.iter().cloned());
+        //     shader_defs.extend(
+        //         module_set
+        //             .shader_defs
+        //             .iter()
+        //             .map(|def| (def.0.clone(), *def.1)),
+        //     );
+        // }
 
-        // can't gracefully report errors for more modules. perhaps this should be a warning
-        assert!((self.module_sets.len() as u32) < u32::MAX >> SPAN_SHIFT);
-        let module_index = self.module_sets.len() + 1;
+        // // remove defs that are already specified through our imports
+        // effective_defs.retain(|name| !shader_defs.contains_key(name));
 
-        let module_set = ComposableModuleDefinition {
-            name: module_name.clone(),
-            sanitized_source: substituted_source,
-            file_path: file_path.to_owned(),
-            language,
-            effective_defs: effective_defs.into_iter().collect(),
-            all_imports: imports.into_iter().map(|id| id.definition.import).collect(),
-            additional_imports,
-            shader_defs,
-            module_index,
-            modules: Default::default(),
-        };
+        // // can't gracefully report errors for more modules. perhaps this should be a warning
+        // assert!((self.module_sets.len() as u32) < u32::MAX >> SPAN_SHIFT);
+        // let module_index = self.module_sets.len() + 1;
 
-        // invalidate dependent modules if this module already exists
-        self.remove_composable_module(&module_name);
+        // let module_set = ComposableModuleDefinition {
+        //     name: module_name.clone(),
+        //     sanitized_source: substituted_source,
+        //     file_path: file_path.to_owned(),
+        //     language,
+        //     effective_defs: effective_defs.into_iter().collect(),
+        //     all_imports: imports.into_iter().map(|id| id.definition.import).collect(),
+        //     additional_imports,
+        //     shader_defs,
+        //     module_index,
+        //     modules: Default::default(),
+        // };
 
-        self.module_sets.insert(module_name.clone(), module_set);
-        self.module_index.insert(module_index, module_name.clone());
-        Ok(self.module_sets.get(&module_name).unwrap())
+        // // invalidate dependent modules if this module already exists
+        // self.remove_composable_module(&module_name);
+
+        // self.module_sets.insert(module_name.clone(), module_set);
+        // self.module_index.insert(module_index, module_name.clone());
+        // Ok(self.module_sets.get(&module_name).unwrap())
+
+        todo!();
     }
 
     /// remove a composable module. also removes modules that depend on this module, as we cannot be sure about
@@ -1584,250 +1592,251 @@ impl Composer {
         &mut self,
         desc: NagaModuleDescriptor,
     ) -> Result<naga::Module, ComposerError> {
-        let NagaModuleDescriptor {
-            source,
-            file_path,
-            shader_type,
-            mut shader_defs,
-            additional_imports,
-        } = desc;
+        // let NagaModuleDescriptor {
+        //     source,
+        //     file_path,
+        //     shader_type,
+        //     mut shader_defs,
+        //     additional_imports,
+        // } = desc;
 
-        let sanitized_source = self.sanitize_and_set_auto_bindings(source);
+        // let sanitized_source = self.sanitize_source(source);
 
-        let PreprocessorMetaData {
-            name,
-            defines,
-            imports,
-            ..
-        } = self
-            .preprocessor
-            .get_preprocessor_metadata(&sanitized_source, true)
-            .map_err(|inner| ComposerError {
-                inner,
-                source: ErrSource::Constructing {
-                    path: file_path.to_owned(),
-                    source: sanitized_source.to_owned(),
-                    offset: 0,
-                },
-            })?;
-        shader_defs.extend(defines);
+        // let PreprocessorMetaData {
+        //     name,
+        //     defines,
+        //     imports,
+        //     ..
+        // } = self
+        //     .preprocessor
+        //     .get_preprocessor_metadata(&sanitized_source, true)
+        //     .map_err(|inner| ComposerError {
+        //         inner,
+        //         source: ErrSource::Constructing {
+        //             path: file_path.to_owned(),
+        //             source: sanitized_source.to_owned(),
+        //             offset: 0,
+        //         },
+        //     })?;
+        // shader_defs.extend(defines);
 
-        let name = name.unwrap_or_default();
+        // let name = name.unwrap_or_default();
 
-        // make sure imports have been added
-        // and gather additional defs specified at module level
-        for (import_name, offset) in imports
-            .iter()
-            .map(|id| (&id.definition.import, id.offset))
-            .chain(additional_imports.iter().map(|ai| (&ai.import, 0)))
-        {
-            if let Some(module_set) = self.module_sets.get(import_name) {
-                for (def, value) in &module_set.shader_defs {
-                    if let Some(prior_value) = shader_defs.insert(def.clone(), *value) {
-                        if prior_value != *value {
-                            return Err(ComposerError {
-                                inner: ComposerErrorInner::InconsistentShaderDefValue {
-                                    def: def.clone(),
-                                },
-                                source: ErrSource::Constructing {
-                                    path: file_path.to_owned(),
-                                    source: sanitized_source.to_owned(),
-                                    offset: 0,
-                                },
-                            });
-                        }
-                    }
-                }
-            } else {
-                return Err(ComposerError {
-                    inner: ComposerErrorInner::ImportNotFound(import_name.clone(), offset),
-                    source: ErrSource::Constructing {
-                        path: file_path.to_owned(),
-                        source: sanitized_source,
-                        offset: 0,
-                    },
-                });
-            }
-        }
-        self.ensure_imports(
-            imports.iter().map(|import| &import.definition),
-            &shader_defs,
-        )?;
-        self.ensure_imports(additional_imports, &shader_defs)?;
+        // // make sure imports have been added
+        // // and gather additional defs specified at module level
+        // for (import_name, offset) in imports
+        //     .iter()
+        //     .map(|id| (&id.definition.import, id.offset))
+        //     .chain(additional_imports.iter().map(|ai| (&ai.import, 0)))
+        // {
+        //     if let Some(module_set) = self.module_sets.get(import_name) {
+        //         for (def, value) in &module_set.shader_defs {
+        //             if let Some(prior_value) = shader_defs.insert(def.clone(), *value) {
+        //                 if prior_value != *value {
+        //                     return Err(ComposerError {
+        //                         inner: ComposerErrorInner::InconsistentShaderDefValue {
+        //                             def: def.clone(),
+        //                         },
+        //                         source: ErrSource::Constructing {
+        //                             path: file_path.to_owned(),
+        //                             source: sanitized_source.to_owned(),
+        //                             offset: 0,
+        //                         },
+        //                     });
+        //                 }
+        //             }
+        //         }
+        //     } else {
+        //         return Err(ComposerError {
+        //             inner: ComposerErrorInner::ImportNotFound(import_name.clone(), offset),
+        //             source: ErrSource::Constructing {
+        //                 path: file_path.to_owned(),
+        //                 source: sanitized_source,
+        //                 offset: 0,
+        //             },
+        //         });
+        //     }
+        // }
+        // self.ensure_imports(
+        //     imports.iter().map(|import| &import.definition),
+        //     &shader_defs,
+        // )?;
+        // self.ensure_imports(additional_imports, &shader_defs)?;
 
-        let definition = ComposableModuleDefinition {
-            name,
-            sanitized_source: sanitized_source.clone(),
-            language: shader_type.into(),
-            file_path: file_path.to_owned(),
-            module_index: 0,
-            additional_imports: additional_imports.to_vec(),
-            // we don't care about these for creating a top-level module
-            effective_defs: Default::default(),
-            all_imports: Default::default(),
-            shader_defs: Default::default(),
-            modules: Default::default(),
-        };
+        // let definition = ComposableModuleDefinition {
+        //     name,
+        //     sanitized_source: sanitized_source.clone(),
+        //     language: shader_type.into(),
+        //     file_path: file_path.to_owned(),
+        //     module_index: 0,
+        //     additional_imports: additional_imports.to_vec(),
+        //     // we don't care about these for creating a top-level module
+        //     effective_defs: Default::default(),
+        //     all_imports: Default::default(),
+        //     shader_defs: Default::default(),
+        //     modules: Default::default(),
+        // };
 
-        let PreprocessOutput {
-            preprocessed_source,
-            imports,
-        } = self
-            .preprocessor
-            .preprocess(&sanitized_source, &shader_defs)
-            .map_err(|inner| ComposerError {
-                inner,
-                source: ErrSource::Constructing {
-                    path: file_path.to_owned(),
-                    source: sanitized_source,
-                    offset: 0,
-                },
-            })?;
+        // let PreprocessOutput {
+        //     preprocessed_source,
+        //     imports,
+        // } = self
+        //     .preprocessor
+        //     .preprocess(&sanitized_source, &shader_defs)
+        //     .map_err(|inner| ComposerError {
+        //         inner,
+        //         source: ErrSource::Constructing {
+        //             path: file_path.to_owned(),
+        //             source: sanitized_source,
+        //             offset: 0,
+        //         },
+        //     })?;
 
-        let composable = self
-            .create_composable_module(
-                &definition,
-                String::from(""),
-                &shader_defs,
-                false,
-                false,
-                &preprocessed_source,
-                imports,
-            )
-            .map_err(|e| ComposerError {
-                inner: e.inner,
-                source: ErrSource::Constructing {
-                    path: definition.file_path.to_owned(),
-                    source: preprocessed_source.clone(),
-                    offset: e.source.offset(),
-                },
-            })?;
+        // let composable = self
+        //     .create_composable_module(
+        //         &definition,
+        //         String::from(""),
+        //         &shader_defs,
+        //         false,
+        //         false,
+        //         &preprocessed_source,
+        //         imports,
+        //     )
+        //     .map_err(|e| ComposerError {
+        //         inner: e.inner,
+        //         source: ErrSource::Constructing {
+        //             path: definition.file_path.to_owned(),
+        //             source: preprocessed_source.clone(),
+        //             offset: e.source.offset(),
+        //         },
+        //     })?;
 
-        let mut derived = DerivedModule::default();
+        // let mut derived = DerivedModule::default();
 
-        let mut already_added = Default::default();
-        for import in &composable.imports {
-            self.add_import(
-                &mut derived,
-                import,
-                &shader_defs,
-                false,
-                &mut already_added,
-            );
-        }
+        // let mut already_added = Default::default();
+        // for import in &composable.imports {
+        //     self.add_import(
+        //         &mut derived,
+        //         import,
+        //         &shader_defs,
+        //         false,
+        //         &mut already_added,
+        //     );
+        // }
 
-        Self::add_composable_data(&mut derived, &composable, None, 0, false);
+        // Self::add_composable_data(&mut derived, &composable, None, 0, false);
 
-        let stage = match shader_type {
-            #[cfg(feature = "glsl")]
-            ShaderType::GlslVertex => Some(naga::ShaderStage::Vertex),
-            #[cfg(feature = "glsl")]
-            ShaderType::GlslFragment => Some(naga::ShaderStage::Fragment),
-            _ => None,
-        };
+        // let stage = match shader_type {
+        //     #[cfg(feature = "glsl")]
+        //     ShaderType::GlslVertex => Some(naga::ShaderStage::Vertex),
+        //     #[cfg(feature = "glsl")]
+        //     ShaderType::GlslFragment => Some(naga::ShaderStage::Fragment),
+        //     _ => None,
+        // };
 
-        let mut entry_points = Vec::default();
-        derived.set_shader_source(&composable.module_ir, 0);
-        for ep in &composable.module_ir.entry_points {
-            let mapped_func = derived.localize_function(&ep.function);
-            entry_points.push(EntryPoint {
-                name: ep.name.clone(),
-                function: mapped_func,
-                stage: stage.unwrap_or(ep.stage),
-                early_depth_test: ep.early_depth_test,
-                workgroup_size: ep.workgroup_size,
-            });
-        }
+        // let mut entry_points = Vec::default();
+        // derived.set_shader_source(&composable.module_ir, 0);
+        // for ep in &composable.module_ir.entry_points {
+        //     let mapped_func = derived.localize_function(&ep.function);
+        //     entry_points.push(EntryPoint {
+        //         name: ep.name.clone(),
+        //         function: mapped_func,
+        //         stage: stage.unwrap_or(ep.stage),
+        //         early_depth_test: ep.early_depth_test,
+        //         workgroup_size: ep.workgroup_size,
+        //     });
+        // }
 
-        let mut naga_module = naga::Module {
-            entry_points,
-            ..derived.into()
-        };
+        // let mut naga_module = naga::Module {
+        //     entry_points,
+        //     ..derived.into()
+        // };
 
-        // apply overrides
-        if !composable.override_functions.is_empty() {
-            let mut redirect = Redirector::new(naga_module);
+        // // apply overrides
+        // if !composable.override_functions.is_empty() {
+        //     let mut redirect = Redirector::new(naga_module);
 
-            for (base_function, overrides) in composable.override_functions {
-                let mut omit = HashSet::default();
+        //     for (base_function, overrides) in composable.override_functions {
+        //         let mut omit = HashSet::default();
 
-                let mut original = base_function;
-                for replacement in overrides {
-                    let (_h_orig, _h_replace) = redirect
-                        .redirect_function(&original, &replacement, &omit)
-                        .map_err(|e| ComposerError {
-                            inner: e.into(),
-                            source: ErrSource::Constructing {
-                                path: file_path.to_owned(),
-                                source: preprocessed_source.clone(),
-                                offset: composable.start_offset,
-                            },
-                        })?;
-                    omit.insert(replacement.clone());
-                    original = replacement;
-                }
-            }
+        //         let mut original = base_function;
+        //         for replacement in overrides {
+        //             let (_h_orig, _h_replace) = redirect
+        //                 .redirect_function(&original, &replacement, &omit)
+        //                 .map_err(|e| ComposerError {
+        //                     inner: e.into(),
+        //                     source: ErrSource::Constructing {
+        //                         path: file_path.to_owned(),
+        //                         source: preprocessed_source.clone(),
+        //                         offset: composable.start_offset,
+        //                     },
+        //                 })?;
+        //             omit.insert(replacement.clone());
+        //             original = replacement;
+        //         }
+        //     }
 
-            naga_module = redirect.into_module().map_err(|e| ComposerError {
-                inner: e.into(),
-                source: ErrSource::Constructing {
-                    path: file_path.to_owned(),
-                    source: preprocessed_source.clone(),
-                    offset: composable.start_offset,
-                },
-            })?;
-        }
+        //     naga_module = redirect.into_module().map_err(|e| ComposerError {
+        //         inner: e.into(),
+        //         source: ErrSource::Constructing {
+        //             path: file_path.to_owned(),
+        //             source: preprocessed_source.clone(),
+        //             offset: composable.start_offset,
+        //         },
+        //     })?;
+        // }
 
-        // validation
-        if self.validate {
-            let info = self.create_validator().validate(&naga_module);
-            match info {
-                Ok(_) => Ok(naga_module),
-                Err(e) => {
-                    let original_span = e.spans().last();
-                    let err_source = match original_span.and_then(|(span, _)| span.to_range()) {
-                        Some(rng) => {
-                            let module_index = rng.start >> SPAN_SHIFT;
-                            match module_index {
-                                0 => ErrSource::Constructing {
-                                    path: file_path.to_owned(),
-                                    source: preprocessed_source.clone(),
-                                    offset: composable.start_offset,
-                                },
-                                _ => {
-                                    let module_name =
-                                        self.module_index.get(&module_index).unwrap().clone();
-                                    let offset = self
-                                        .module_sets
-                                        .get(&module_name)
-                                        .unwrap()
-                                        .get_module(&shader_defs)
-                                        .unwrap()
-                                        .start_offset;
-                                    ErrSource::Module {
-                                        name: module_name,
-                                        offset,
-                                        defs: shader_defs.clone(),
-                                    }
-                                }
-                            }
-                        }
-                        None => ErrSource::Constructing {
-                            path: file_path.to_owned(),
-                            source: preprocessed_source.clone(),
-                            offset: composable.start_offset,
-                        },
-                    };
+        // // validation
+        // if self.validate {
+        //     let info = self.create_validator().validate(&naga_module);
+        //     match info {
+        //         Ok(_) => Ok(naga_module),
+        //         Err(e) => {
+        //             let original_span = e.spans().last();
+        //             let err_source = match original_span.and_then(|(span, _)| span.to_range()) {
+        //                 Some(rng) => {
+        //                     let module_index = rng.start >> SPAN_SHIFT;
+        //                     match module_index {
+        //                         0 => ErrSource::Constructing {
+        //                             path: file_path.to_owned(),
+        //                             source: preprocessed_source.clone(),
+        //                             offset: composable.start_offset,
+        //                         },
+        //                         _ => {
+        //                             let module_name =
+        //                                 self.module_index.get(&module_index).unwrap().clone();
+        //                             let offset = self
+        //                                 .module_sets
+        //                                 .get(&module_name)
+        //                                 .unwrap()
+        //                                 .get_module(&shader_defs)
+        //                                 .unwrap()
+        //                                 .start_offset;
+        //                             ErrSource::Module {
+        //                                 name: module_name,
+        //                                 offset,
+        //                                 defs: shader_defs.clone(),
+        //                             }
+        //                         }
+        //                     }
+        //                 }
+        //                 None => ErrSource::Constructing {
+        //                     path: file_path.to_owned(),
+        //                     source: preprocessed_source.clone(),
+        //                     offset: composable.start_offset,
+        //                 },
+        //             };
 
-                    Err(ComposerError {
-                        inner: ComposerErrorInner::ShaderValidationError(e),
-                        source: err_source,
-                    })
-                }
-            }
-        } else {
-            Ok(naga_module)
-        }
+        //             Err(ComposerError {
+        //                 inner: ComposerErrorInner::ShaderValidationError(e),
+        //                 source: err_source,
+        //             })
+        //         }
+        //     }
+        // } else {
+        //     Ok(naga_module)
+        // }
+        todo!()
     }
 }
 

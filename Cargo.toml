@@ -17,7 +17,7 @@ prune = []
 allow_deprecated = []
 
 [dependencies]
-naga = { version = "22.1", features = ["wgsl-in", "wgsl-out"] }
+naga = { path = "../wgpu/naga", features = ["wgsl-in", "wgsl-out"] }
 tracing = "0.1"
 regex = "1.8"
 regex-syntax = "0.8"

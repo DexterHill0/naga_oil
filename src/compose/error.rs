@@ -163,7 +163,8 @@ impl<'a> Iterator for ErrorSources<'a> {
 impl ComposerError {
     /// format a Composer error
     pub fn emit_to_string(&self, composer: &Composer) -> String {
-        composer.undecorate(&self.emit_to_string_internal(composer))
+        todo!();
+        // composer.undecorate(&self.emit_to_string_internal(composer))
     }
 
     fn emit_to_string_internal(&self, composer: &Composer) -> String {
