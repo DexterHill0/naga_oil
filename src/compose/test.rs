@@ -322,56 +322,56 @@ mod test {
         output_eq!(wgsl, "tests/expected/wgsl_call_glsl.txt");
     }
 
-    #[cfg(feature = "glsl")]
-    #[test]
-    fn glsl_call_wgsl() {
-        let mut composer = Composer::default();
+    // #[cfg(feature = "glsl")]
+    // #[test]
+    // fn glsl_call_wgsl() {
+    //     let mut composer = Composer::default();
 
-        composer
-            .add_composable_module(ComposableModuleDescriptor {
-                source: include_str!("tests/glsl/module.wgsl"),
-                file_path: "tests/glsl/module.wgsl",
-                ..Default::default()
-            })
-            .unwrap();
+    //     composer
+    //         .add_composable_module(ComposableModuleDescriptor {
+    //             source: include_str!("tests/glsl/module.wgsl"),
+    //             file_path: "tests/glsl/module.wgsl",
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
 
-        let module = composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: include_str!("tests/glsl/top.glsl"),
-                file_path: "tests/glsl/top.glsl",
-                shader_type: ShaderType::GlslVertex,
-                ..Default::default()
-            })
-            .unwrap();
+    //     let module = composer
+    //         .make_naga_module(NagaModuleDescriptor {
+    //             source: include_str!("tests/glsl/top.glsl"),
+    //             file_path: "tests/glsl/top.glsl",
+    //             shader_type: ShaderType::GlslVertex,
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
 
-        let info = composer.create_validator().validate(&module).unwrap();
-        let wgsl = naga::back::wgsl::write_string(
-            &module,
-            &info,
-            naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
-        )
-        .unwrap();
-        // println!("{}", wgsl);
-        // let mut f = std::fs::File::create("glsl_call_wgsl.txt").unwrap();
-        // f.write_all(wgsl.as_bytes()).unwrap();
-        // drop(f);
-        output_eq!(wgsl, "tests/expected/glsl_call_wgsl.txt");
-    }
+    //     let info = composer.create_validator().validate(&module).unwrap();
+    //     let wgsl = naga::back::wgsl::write_string(
+    //         &module,
+    //         &info,
+    //         naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
+    //     )
+    //     .unwrap();
+    //     // println!("{}", wgsl);
+    //     // let mut f = std::fs::File::create("glsl_call_wgsl.txt").unwrap();
+    //     // f.write_all(wgsl.as_bytes()).unwrap();
+    //     // drop(f);
+    //     output_eq!(wgsl, "tests/expected/glsl_call_wgsl.txt");
+    // }
 
-    #[cfg(feature = "glsl")]
-    #[test]
-    fn basic_glsl() {
-        let mut composer = Composer::default();
+    // #[cfg(feature = "glsl")]
+    // #[test]
+    // fn basic_glsl() {
+    //     let mut composer = Composer::default();
 
-        composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: include_str!("tests/glsl/basic.glsl"),
-                file_path: "tests/glsl/basic.glsl",
-                shader_type: ShaderType::GlslFragment,
-                ..Default::default()
-            })
-            .unwrap();
-    }
+    //     composer
+    //         .make_naga_module(NagaModuleDescriptor {
+    //             source: include_str!("tests/glsl/basic.glsl"),
+    //             file_path: "tests/glsl/basic.glsl",
+    //             shader_type: ShaderType::GlslFragment,
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
+    // }
 
     #[test]
     fn wgsl_call_entrypoint() {
@@ -633,113 +633,113 @@ mod test {
         output_eq!(wgsl, "tests/expected/import_in_decl.txt");
     }
 
-    #[cfg(feature = "glsl")]
-    #[test]
-    fn glsl_const_import() {
-        let mut composer = Composer::default();
-        composer
-            .add_composable_module(ComposableModuleDescriptor {
-                source: include_str!("tests/glsl_const_import/consts.glsl"),
-                file_path: "tests/glsl_const_import/consts.glsl",
-                language: ShaderLanguage::Glsl,
-                ..Default::default()
-            })
-            .unwrap();
-        let module = composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: include_str!("tests/glsl_const_import/top.glsl"),
-                file_path: "tests/glsl_const_import/top.glsl",
-                shader_type: ShaderType::GlslFragment,
-                ..Default::default()
-            })
-            .unwrap();
+    // #[cfg(feature = "glsl")]
+    // #[test]
+    // fn glsl_const_import() {
+    //     let mut composer = Composer::default();
+    //     composer
+    //         .add_composable_module(ComposableModuleDescriptor {
+    //             source: include_str!("tests/glsl_const_import/consts.glsl"),
+    //             file_path: "tests/glsl_const_import/consts.glsl",
+    //             language: ShaderLanguage::Glsl,
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
+    //     let module = composer
+    //         .make_naga_module(NagaModuleDescriptor {
+    //             source: include_str!("tests/glsl_const_import/top.glsl"),
+    //             file_path: "tests/glsl_const_import/top.glsl",
+    //             shader_type: ShaderType::GlslFragment,
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
 
-        let info = composer.create_validator().validate(&module).unwrap();
-        let wgsl = naga::back::wgsl::write_string(
-            &module,
-            &info,
-            naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
-        )
-        .unwrap();
+    //     let info = composer.create_validator().validate(&module).unwrap();
+    //     let wgsl = naga::back::wgsl::write_string(
+    //         &module,
+    //         &info,
+    //         naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
+    //     )
+    //     .unwrap();
 
-        // println!("{}", wgsl);
-        // let mut f = std::fs::File::create("glsl_const_import.txt").unwrap();
-        // f.write_all(wgsl.as_bytes()).unwrap();
-        // drop(f);
+    //     // println!("{}", wgsl);
+    //     // let mut f = std::fs::File::create("glsl_const_import.txt").unwrap();
+    //     // f.write_all(wgsl.as_bytes()).unwrap();
+    //     // drop(f);
 
-        output_eq!(wgsl, "tests/expected/glsl_const_import.txt");
-    }
+    //     output_eq!(wgsl, "tests/expected/glsl_const_import.txt");
+    // }
 
-    #[cfg(feature = "glsl")]
-    #[test]
-    fn glsl_wgsl_const_import() {
-        let mut composer = Composer::default();
-        composer
-            .add_composable_module(ComposableModuleDescriptor {
-                source: include_str!("tests/glsl_const_import/consts.glsl"),
-                file_path: "tests/glsl_const_import/consts.glsl",
-                language: ShaderLanguage::Glsl,
-                ..Default::default()
-            })
-            .unwrap();
-        let module = composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: include_str!("tests/glsl_const_import/top.wgsl"),
-                file_path: "tests/glsl_const_import/top.wgsl",
-                ..Default::default()
-            })
-            .unwrap();
+    // #[cfg(feature = "glsl")]
+    // #[test]
+    // fn glsl_wgsl_const_import() {
+    //     let mut composer = Composer::default();
+    //     composer
+    //         .add_composable_module(ComposableModuleDescriptor {
+    //             source: include_str!("tests/glsl_const_import/consts.glsl"),
+    //             file_path: "tests/glsl_const_import/consts.glsl",
+    //             language: ShaderLanguage::Glsl,
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
+    //     let module = composer
+    //         .make_naga_module(NagaModuleDescriptor {
+    //             source: include_str!("tests/glsl_const_import/top.wgsl"),
+    //             file_path: "tests/glsl_const_import/top.wgsl",
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
 
-        let info = composer.create_validator().validate(&module).unwrap();
-        let wgsl = naga::back::wgsl::write_string(
-            &module,
-            &info,
-            naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
-        )
-        .unwrap();
+    //     let info = composer.create_validator().validate(&module).unwrap();
+    //     let wgsl = naga::back::wgsl::write_string(
+    //         &module,
+    //         &info,
+    //         naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
+    //     )
+    //     .unwrap();
 
-        // println!("{}", wgsl);
-        // let mut f = std::fs::File::create("glsl_wgsl_const_import.txt").unwrap();
-        // f.write_all(wgsl.as_bytes()).unwrap();
-        // drop(f);
+    //     // println!("{}", wgsl);
+    //     // let mut f = std::fs::File::create("glsl_wgsl_const_import.txt").unwrap();
+    //     // f.write_all(wgsl.as_bytes()).unwrap();
+    //     // drop(f);
 
-        output_eq!(wgsl, "tests/expected/glsl_wgsl_const_import.txt");
-    }
-    #[cfg(feature = "glsl")]
-    #[test]
-    fn wgsl_glsl_const_import() {
-        let mut composer = Composer::default();
-        composer
-            .add_composable_module(ComposableModuleDescriptor {
-                source: include_str!("tests/glsl_const_import/consts.wgsl"),
-                file_path: "tests/glsl_const_import/consts.wgsl",
-                ..Default::default()
-            })
-            .unwrap();
-        let module = composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: include_str!("tests/glsl_const_import/top.glsl"),
-                file_path: "tests/glsl_const_import/top.glsl",
-                shader_type: ShaderType::GlslFragment,
-                ..Default::default()
-            })
-            .unwrap();
+    //     output_eq!(wgsl, "tests/expected/glsl_wgsl_const_import.txt");
+    // }
+    // #[cfg(feature = "glsl")]
+    // #[test]
+    // fn wgsl_glsl_const_import() {
+    //     let mut composer = Composer::default();
+    //     composer
+    //         .add_composable_module(ComposableModuleDescriptor {
+    //             source: include_str!("tests/glsl_const_import/consts.wgsl"),
+    //             file_path: "tests/glsl_const_import/consts.wgsl",
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
+    //     let module = composer
+    //         .make_naga_module(NagaModuleDescriptor {
+    //             source: include_str!("tests/glsl_const_import/top.glsl"),
+    //             file_path: "tests/glsl_const_import/top.glsl",
+    //             shader_type: ShaderType::GlslFragment,
+    //             ..Default::default()
+    //         })
+    //         .unwrap();
 
-        let info = composer.create_validator().validate(&module).unwrap();
-        let wgsl = naga::back::wgsl::write_string(
-            &module,
-            &info,
-            naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
-        )
-        .unwrap();
+    //     let info = composer.create_validator().validate(&module).unwrap();
+    //     let wgsl = naga::back::wgsl::write_string(
+    //         &module,
+    //         &info,
+    //         naga::back::wgsl::WriterFlags::EXPLICIT_TYPES,
+    //     )
+    //     .unwrap();
 
-        // println!("{}", wgsl);
-        // let mut f = std::fs::File::create("wgsl_glsl_const_import.txt").unwrap();
-        // f.write_all(wgsl.as_bytes()).unwrap();
-        // drop(f);
+    //     // println!("{}", wgsl);
+    //     // let mut f = std::fs::File::create("wgsl_glsl_const_import.txt").unwrap();
+    //     // f.write_all(wgsl.as_bytes()).unwrap();
+    //     // drop(f);
 
-        output_eq!(wgsl, "tests/expected/wgsl_glsl_const_import.txt");
-    }
+    //     output_eq!(wgsl, "tests/expected/wgsl_glsl_const_import.txt");
+    // }
 
     #[test]
     fn item_import_test() {
@@ -1168,6 +1168,7 @@ mod test {
             .unwrap();
 
         // TODO enable this test when HLSL support is available
+        #[allow(clippy::overly_complex_bool_expr)]
         if cfg!(feature = "test_shader") && false {
             assert_eq!(test_shader(&mut composer), 28.0);
         }

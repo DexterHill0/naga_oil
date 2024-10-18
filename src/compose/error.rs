@@ -116,7 +116,7 @@ pub enum ComposerErrorInner {
 
     // NOTE(dexterhill0) i'm adding these errors but if theres a better way exist to do this/they already exist let me know
     #[error("unexpected token in shader def. expected {expected} name, found {found}")]
-    ExpectedTokenInShaderDef {
+    UnexpectedTokenInShaderDirective {
         pos: usize,
         expected: String,
         found: String,
@@ -286,7 +286,7 @@ impl ComposerError {
                     .with_message(self.inner.to_string())],
                 vec![],
             ),
-            ComposerErrorInner::ExpectedTokenInShaderDef {
+            ComposerErrorInner::UnexpectedTokenInShaderDirective {
                 pos,
                 expected,
                 found,
