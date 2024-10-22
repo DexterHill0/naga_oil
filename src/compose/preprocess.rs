@@ -11,27 +11,30 @@ use naga::front::wgsl::parse::{
 use regex::Regex;
 
 use super::{
-    comment_strip_iter::CommentReplaceExt, parse_imports::parse_imports, ComposerErrorInner,
-    ImportDefWithOffset, ShaderDefValue,
+    comment_strip_iter::CommentReplaceExt,
+    parse_imports::{parse_imports, substitute_identifiers},
+    ComposerErrorInner, ImportDefWithOffset, ShaderDefValue,
 };
 
 struct TokenDisplay<'a>(pub Token<'a>);
-impl ToString for TokenDisplay<'_> {
-    fn to_string(&self) -> String {
+impl Display for TokenDisplay<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            Token::Separator(c) | Token::Paren(c) | Token::Unknown(c) => format!("character `{c}`"),
-            Token::Attribute => "attribute".into(),
-            Token::Number(_) => "number".into(),
-            Token::Word(w) => format!("word `{w}`"),
+            Token::Separator(c) | Token::Paren(c) | Token::Unknown(c) => {
+                write!(f, "character `{c}`")
+            }
+            Token::Attribute => write!(f, "attribute"),
+            Token::Number(_) => write!(f, "number"),
+            Token::Word(w) => write!(f, "word `{w}`"),
             Token::Operation(o)
             | Token::LogicalOperation(o)
             | Token::ShiftOperation(o)
-            | Token::AssignmentOperation(o) => format!("operator `{o}`"),
-            Token::IncrementOperation => "operator `++`".into(),
-            Token::DecrementOperation => "operator `--`".into(),
-            Token::Arrow => "arrow".into(),
-            Token::Trivia => "comment".into(),
-            Token::End => "end of file".into(),
+            | Token::AssignmentOperation(o) => write!(f, "operator `{o}`"),
+            Token::IncrementOperation => write!(f, "operator `++`"),
+            Token::DecrementOperation => write!(f, "operator `--`"),
+            Token::Arrow => write!(f, "arrow"),
+            Token::Trivia => write!(f, "comment"),
+            Token::End => write!(f, "end of file"),
         }
     }
 }
@@ -45,33 +48,17 @@ enum ShaderDefIfOp {
     Eq,
 }
 
-impl ToString for ShaderDefIfOp {
-    fn to_string(&self) -> String {
+impl Display for ShaderDefIfOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ShaderDefIfOp::Gt => ">",
-            ShaderDefIfOp::Gte => ">=",
-            ShaderDefIfOp::Lt => "<",
-            ShaderDefIfOp::Lte => "<=",
-            ShaderDefIfOp::Ne => "!=",
-            ShaderDefIfOp::Eq => "==",
+            ShaderDefIfOp::Gt => write!(f, ">"),
+            ShaderDefIfOp::Gte => write!(f, ">="),
+            ShaderDefIfOp::Lt => write!(f, "<"),
+            ShaderDefIfOp::Lte => write!(f, "<="),
+            ShaderDefIfOp::Ne => write!(f, "!="),
+            ShaderDefIfOp::Eq => write!(f, "=="),
         }
-        .into()
     }
-}
-
-macro_rules! get_next_or_error {
-    ($lexer:ident, $tok:path, $offset:ident) => {{
-        match $lexer.next() {
-            ($tok(v), ..) => Ok(v),
-            tok => {
-                return Err(ComposerErrorInner::UnexpectedTokenInShaderDirective {
-                    pos: $offset,
-                    expected: "definition name".into(),
-                    found: TokenDisplay(tok.0).to_string(),
-                })
-            }
-        }
-    }};
 }
 
 #[derive(Debug)]
@@ -526,7 +513,7 @@ impl<'p> Preprocessor<'p> {
         let mut lexer = Lexer::new(shader_str);
 
         let mut declared_imports = IndexMap::default();
-        // let mut used_imports = IndexMap::default();
+        let mut used_imports: IndexMap<String, ImportDefWithOffset> = IndexMap::default();
         let mut name = None;
         let mut offset = 0;
         let mut defines = HashMap::default();
@@ -539,6 +526,8 @@ impl<'p> Preprocessor<'p> {
                 break;
             }
 
+            // naga lexer doesnt count '#' as a valid character
+            // but luckily for us it still stores it as an "unkown" token
             // this can be changed in the future if need be
             if !matches!(token, Token::Unknown('#')) {
                 continue;
@@ -553,76 +542,30 @@ impl<'p> Preprocessor<'p> {
                 }
             }
 
-            // naga lexer doesnt count '#' as a valid character
-            // but luckily for us it still stores it as an "unkown" token
-            // personally i think `@` would work better but that would be a breaking change
             match lexer.peek() {
-                (Token::Word("import"), directive_span) => {
-                    let mut import_lines = String::default();
-                    let mut open_count = 0;
-                    let initial_offset = offset;
-
-                    // let mut check = lexer.clone();
-                    // let mut indent = 1;
-
-                    // let after_close = loop {
-                    //     match check.next() {
-                    //         Token::Paren('{') => indent += 1,
-                    //         Token::End => {
-                    //             return Err(SyntaxError::UnmatchedToken {
-                    //                 not_found: Token::RParen,
-                    //                 for_char: Token::LParen,
-                    //                 area: self.make_area(start),
-                    //             })
-                    //         }
-                    //         Token::Paren('}') => {
-                    //             indent -= 1;
-                    //             if indent == 0 {
-                    //                 break check.next()?;
-                    //             }
-                    //         }
-                    //         _ => (),
-                    //     }
-                    // };
-
-                    //         loop {
-                    //             // PERF: Ideally we don't do multiple `match_indices` passes over `line`
-                    //             // in addition to the final pass for the import parse
-                    //             open_count += line.match_indices('{').count();
-                    //             open_count = open_count.saturating_sub(line.match_indices('}').count());
-
-                    //             // PERF: it's bad that we allocate here. ideally we would use something like
-                    //             //     let import_lines = &shader_str[initial_offset..offset]
-                    //             // but we need the comments removed, and the iterator approach doesn't make that easy
-                    //             import_lines.push_str(&line);
-                    //             import_lines.push('\n');
-
-                    //             if open_count == 0 || lines.peek().is_none() {
-                    //                 break;
-                    //             }
-
-                    //             // output spaces for removed lines to keep spans consistent (errors report against substituted_source, which is not preprocessed)
-                    //             offset += line.len() + 1;
-
-                    //             line = lines.next().unwrap();
-                    //         }
+                // import def
+                (Token::Word("import"), ..) => {
+                    let _ = lexer.next();
 
                     parse_imports(lexer.clone(), &mut declared_imports).map_err(
                         |(err, line_offset)| {
-                            ComposerErrorInner::ImportParseError(
-                                err.to_owned(),
-                                initial_offset + line_offset,
-                            )
+                            ComposerErrorInner::ImportParseError(err.to_owned(), line_offset)
                         },
                     )?;
                 }
-                (Token::Word("define_import_path"), directive_span) => {
+                // import path def
+                (Token::Word("define_import_path"), ..) => {
+                    let _ = lexer.next();
+
                     name = self
                         .get_next_word(&mut lexer, offset)
                         .ok()
                         .map(|f| f.to_string());
                 }
-                (Token::Word("define"), directive_span) => {
+                // define shader def
+                (Token::Word("define"), ..) => {
+                    let _ = lexer.next();
+
                     if allow_defines {
                         let name = self.get_next_word(&mut lexer, offset)?;
                         let val = self.get_shader_def_value_string(&mut lexer, offset);
@@ -646,8 +589,49 @@ impl<'p> Preprocessor<'p> {
                         return Err(ComposerErrorInner::DefineInModule(offset));
                     }
                 }
+                (
+                    Token::Word("ifdef")
+                    | Token::Word("endif")
+                    | Token::Word("else")
+                    | Token::Word("if")
+                    | Token::Word("version"),
+                    ..,
+                ) => continue,
+                // def / def delmited
+                (Token::Word(..) | Token::Paren('{'), ..) => {
+                    let name;
+                    if lexer.skip(Token::Paren('{')) {
+                        name = self.get_next_word(&mut lexer, offset)?;
 
-                _ => continue,
+                        match lexer.next() {
+                            (Token::Paren('}'), ..) => {}
+                            (tok, span) => {
+                                return Err(ComposerErrorInner::UnexpectedTokenInShaderDirective {
+                                    pos: span.to_range().unwrap().start,
+                                    expected: "}".to_string(),
+                                    found: TokenDisplay(tok).to_string(),
+                                })
+                            }
+                        }
+                    } else {
+                        name = self.get_next_word(&mut lexer, offset)?;
+                    }
+
+                    effective_defs.insert(name.to_string());
+                }
+                _ => {
+                    substitute_identifiers(
+                        &mut lexer,
+                        offset,
+                        &declared_imports,
+                        &mut used_imports,
+                        true,
+                    )
+                    .unwrap();
+
+                    // the function will have consumed the rest of the tokens
+                    break;
+                }
             }
         }
 
@@ -667,11 +651,9 @@ impl<'p> Preprocessor<'p> {
         //     offset += line.len() + 1;
         // }
 
-        todo!();
-
         Ok(PreprocessorMetaData {
             name,
-            imports: vec![], //used_imports.into_values().collect(),
+            imports: used_imports.into_values().collect(),
             defines,
             effective_defs,
         })

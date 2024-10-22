@@ -1,5 +1,8 @@
 use indexmap::IndexMap;
-use naga::front::wgsl::parse::lexer::{Lexer, Token};
+use naga::{
+    front::wgsl::parse::lexer::{Lexer, Token},
+    Span,
+};
 
 use super::{Composer, ImportDefWithOffset, ImportDefinition};
 
@@ -157,7 +160,7 @@ pub fn parse_imports<'a>(
                 let _ = lexer.next();
 
                 #[cfg(not(feature = "allow_deprecated"))]
-                tracing::warn!("item list imports are deprecated, please use `rust::style::item_imports` (or use feature `allow_deprecated`)`\n| {}", input);
+                tracing::warn!("item list imports are deprecated, please use `rust::style::item_imports` (or use crate feature `allow_deprecated`)`");
 
                 as_name = Some(name);
 
@@ -172,13 +175,22 @@ pub fn parse_imports<'a>(
             _ => {}
         }
 
-        match lexer.peek() {
+        // to save adding another method to the lexer
+        let mut peek_raw = lexer.clone();
+        match peek_raw.next_raw() {
             (
-                t
-                @ (Token::Paren('}') | Token::Separator(',') | Token::Separator(';') | Token::End),
+                t @ (Token::Paren('}')
+                | Token::Separator(',')
+                | Token::Separator(';')
+                | Token::Trivia
+                | Token::End),
                 token_span,
             ) => {
-                let _ = lexer.next();
+                if t != Token::Trivia {
+                    let _ = lexer.next();
+                } else if nest_level > 0 {
+                    continue;
+                }
 
                 let stack_top = stack.last_mut().unwrap();
 
@@ -194,11 +206,14 @@ pub fn parse_imports<'a>(
                     .or_default()
                     .push(stack_top.join("::"));
 
+                dbg!(&declared_imports);
+
                 match t {
                     Token::Paren('}') => {
                         nest_level -= 1;
                     }
                     Token::Separator(';') | Token::End => break token_span,
+                    Token::Trivia if nest_level == 0 => break token_span,
                     _ => (),
                 }
 
@@ -241,89 +256,96 @@ pub fn parse_imports<'a>(
         return Err(("unclosed brace", pos!(last_span, span_offset)));
     }
 
-    // dbg!(declared_imports);
-
     Ok(())
 }
 
-// pub fn substitute_identifiers(
-//     input: &str,
-//     offset: usize,
-//     declared_imports: &IndexMap<String, Vec<String>>,
-//     used_imports: &mut IndexMap<String, ImportDefWithOffset>,
-//     allow_ambiguous: bool,
-// ) -> Result<String, usize> {
-//     let tokens = Tokenizer::new(input, true);
-//     let mut output = String::with_capacity(input.len());
-//     let mut in_substitution_position = true;
+fn token_to_string(span: Span, source: &str, out: &mut String) {
+    let range = span.to_range().unwrap();
+    out.push_str(&source[range.start..range.end]);
+}
 
-//     for token in tokens {
-//         match token {
-//             Token::Identifier(ident, token_pos) => {
-//                 if in_substitution_position {
-//                     let (first, residual) = ident.split_once("::").unwrap_or((ident, ""));
-//                     let full_paths = declared_imports
-//                         .get(first)
-//                         .cloned()
-//                         .unwrap_or(vec![first.to_owned()]);
+pub fn substitute_identifiers(
+    lexer: &mut Lexer<'_>,
+    offset: usize,
+    declared_imports: &IndexMap<String, Vec<String>>,
+    used_imports: &mut IndexMap<String, ImportDefWithOffset>,
+    allow_ambiguous: bool,
+) -> Result<String, usize> {
+    let mut output = String::new();
+    let mut in_substitution_position = true;
 
-//                     if !allow_ambiguous && full_paths.len() > 1 {
-//                         return Err(offset + token_pos);
-//                     }
+    loop {
+        match lexer.next_raw() {
+            (Token::Word(ident), span) => {
+                if in_substitution_position {
+                    let token_pos = span.to_range().unwrap().start;
 
-//                     for mut full_path in full_paths {
-//                         if !residual.is_empty() {
-//                             full_path.push_str("::");
-//                             full_path.push_str(residual);
-//                         }
+                    let (first, residual) = ident.split_once("::").unwrap_or((ident, ""));
+                    let full_paths = declared_imports
+                        .get(first)
+                        .cloned()
+                        .unwrap_or(vec![first.to_owned()]);
 
-//                         if let Some((module, item)) = full_path.rsplit_once("::") {
-//                             used_imports
-//                                 .entry(module.to_owned())
-//                                 .or_insert_with(|| ImportDefWithOffset {
-//                                     definition: ImportDefinition {
-//                                         import: module.to_owned(),
-//                                         ..Default::default()
-//                                     },
-//                                     offset: offset + token_pos,
-//                                 })
-//                                 .definition
-//                                 .items
-//                                 .push(item.to_owned());
-//                             output.push_str(item);
-//                             output.push_str(&Composer::decorate(module));
-//                         } else if full_path.find('"').is_some() {
-//                             // we don't want to replace local variables that shadow quoted module imports with the
-//                             // quoted name as that won't compile.
-//                             // since quoted items always refer to modules, we can just emit the original ident
-//                             // in this case
-//                             output.push_str(ident);
-//                         } else {
-//                             // if there are no quotes we do the replacement. this means that individually imported
-//                             // items can be used, and any shadowing local variables get harmlessly renamed.
-//                             // TODO: it can lead to weird errors, but such is life
-//                             output.push_str(&full_path);
-//                         }
-//                     }
-//                 } else {
-//                     output.push_str(ident);
-//                 }
-//             }
-//             Token::Other(other, _) => {
-//                 output.push(other);
-//                 if other == '.' || other == '@' {
-//                     in_substitution_position = false;
-//                     continue;
-//                 }
-//             }
-//             Token::Whitespace(ws, _) => output.push_str(ws),
-//         }
+                    if !allow_ambiguous && full_paths.len() > 1 {
+                        return Err(offset + token_pos);
+                    }
 
-//         in_substitution_position = true;
-//     }
+                    for mut full_path in full_paths {
+                        if !residual.is_empty() {
+                            full_path.push_str("::");
+                            full_path.push_str(residual);
+                        }
 
-//     Ok(output)
-// }
+                        if let Some((module, item)) = full_path.rsplit_once("::") {
+                            used_imports
+                                .entry(module.to_owned())
+                                .or_insert_with(|| ImportDefWithOffset {
+                                    definition: ImportDefinition {
+                                        import: module.to_owned(),
+                                        ..Default::default()
+                                    },
+                                    offset: offset + token_pos,
+                                })
+                                .definition
+                                .items
+                                .push(item.to_owned());
+                            output.push_str(item);
+                            output.push_str(&Composer::decorate(module));
+                        } else if full_path.find('"').is_some() {
+                            // we don't want to replace local variables that shadow quoted module imports with the
+                            // quoted name as that won't compile.
+                            // since quoted items always refer to modules, we can just emit the original ident
+                            // in this case
+                            output.push_str(ident);
+                        } else {
+                            // if there are no quotes we do the replacement. this means that individually imported
+                            // items can be used, and any shadowing local variables get harmlessly renamed.
+                            // TODO: it can lead to weird errors, but such is life
+                            output.push_str(&full_path);
+                        }
+                    }
+                } else {
+                    output.push_str(ident);
+                }
+            }
+            (Token::Separator('.') | Token::Attribute, span) => {
+                token_to_string(span, lexer.source, &mut output);
+                in_substitution_position = false;
+                continue;
+            }
+            (Token::End, ..) => {
+                break;
+            }
+            (.., span) => token_to_string(span, lexer.source, &mut output),
+        }
+
+        in_substitution_position = true;
+    }
+
+    dbg!(&output);
+
+    Ok(output)
+}
 
 #[cfg(test)]
 fn test_parse(input: &str) -> Result<IndexMap<String, Vec<String>>, (&str, usize)> {
