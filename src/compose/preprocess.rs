@@ -13,7 +13,7 @@ use regex::Regex;
 use super::{
     comment_strip_iter::CommentReplaceExt,
     parse_imports::{parse_imports, substitute_identifiers},
-    ComposerErrorInner, ImportDefWithOffset, ShaderDefValue,
+    ComposerErrorInner, ImportDefWithOffset, ImportDefinition, ShaderDefValue,
 };
 
 struct TokenDisplay<'a>(pub Token<'a>);
@@ -503,6 +503,55 @@ impl<'p> Preprocessor<'p> {
         // })
     }
 
+    fn try_parse_path(
+        &self,
+        lexer: &mut Lexer<'p>,
+    ) -> Result<Option<Vec<&'p str>>, ComposerErrorInner> {
+        let mut must_have_ident_next = false;
+        let mut segments = vec![];
+
+        loop {
+            match lexer.peek() {
+                (Token::Word(ident), ..) => {
+                    let _ = lexer.next();
+
+                    segments.push(ident);
+
+                    match lexer.peek() {
+                        (Token::Separator(':'), ..) => {
+                            let _ = lexer.next();
+
+                            match lexer.next() {
+                                (Token::Separator(':'), ..) => must_have_ident_next = true,
+                                (tok, span) => {
+                                    return Err(
+                                        ComposerErrorInner::UnexpectedTokenInShaderDirective {
+                                            pos: span.to_range().unwrap().start,
+                                            expected: ":".to_string(),
+                                            found: TokenDisplay(tok).to_string(),
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        _ => return Ok(Some(segments)),
+                    }
+                }
+                (tok, span) => {
+                    if must_have_ident_next {
+                        return Err(ComposerErrorInner::UnexpectedTokenInShaderDirective {
+                            pos: span.to_range().unwrap().start,
+                            expected: "ident".to_string(),
+                            found: TokenDisplay(tok).to_string(),
+                        });
+                    }
+
+                    return Ok(None);
+                }
+            }
+        }
+    }
+
     // extract module name and all possible imports
     pub fn get_preprocessor_metadata(
         &mut self,
@@ -519,8 +568,10 @@ impl<'p> Preprocessor<'p> {
         let mut defines = HashMap::default();
         let mut effective_defs = HashSet::default();
 
+        let mut in_substitution_position = true;
+
         loop {
-            let (token, token_span) = lexer.next();
+            let (token, token_span) = lexer.peek();
 
             if token == Token::End {
                 break;
@@ -529,127 +580,162 @@ impl<'p> Preprocessor<'p> {
             // naga lexer doesnt count '#' as a valid character
             // but luckily for us it still stores it as an "unkown" token
             // this can be changed in the future if need be
-            if !matches!(token, Token::Unknown('#')) {
-                continue;
-            }
+            if matches!(token, Token::Unknown('#')) {
+                let _ = lexer.next();
 
-            let (is_scope, def) =
-                self.check_scope(&HashMap::default(), lexer.clone(), None, offset)?;
+                let (is_scope, def) =
+                    self.check_scope(&HashMap::default(), lexer.clone(), None, offset)?;
 
-            if is_scope {
-                if let Some(def) = def {
-                    effective_defs.insert(def.to_owned());
-                }
-            }
-
-            match lexer.peek() {
-                // import def
-                (Token::Word("import"), ..) => {
-                    let _ = lexer.next();
-
-                    parse_imports(lexer.clone(), &mut declared_imports).map_err(
-                        |(err, line_offset)| {
-                            ComposerErrorInner::ImportParseError(err.to_owned(), line_offset)
-                        },
-                    )?;
-                }
-                // import path def
-                (Token::Word("define_import_path"), ..) => {
-                    let _ = lexer.next();
-
-                    name = self
-                        .get_next_word(&mut lexer, offset)
-                        .ok()
-                        .map(|f| f.to_string());
-                }
-                // define shader def
-                (Token::Word("define"), ..) => {
-                    let _ = lexer.next();
-
-                    if allow_defines {
-                        let name = self.get_next_word(&mut lexer, offset)?;
-                        let val = self.get_shader_def_value_string(&mut lexer, offset);
-
-                        let value = if let Ok(val) = val {
-                            if let Ok(val) = val.as_str().parse::<u64>() {
-                                ShaderDefValue::UInt(val)
-                            } else if let Ok(val) = val.as_str().parse::<i64>() {
-                                ShaderDefValue::Int(val)
-                            } else if let Ok(val) = val.as_str().parse::<bool>() {
-                                ShaderDefValue::Bool(val)
-                            } else {
-                                ShaderDefValue::Bool(false) // this error will get picked up when we fully preprocess the module
-                            }
-                        } else {
-                            ShaderDefValue::Bool(true)
-                        };
-
-                        defines.insert(name.to_string(), value);
-                    } else {
-                        return Err(ComposerErrorInner::DefineInModule(offset));
+                if is_scope {
+                    if let Some(def) = def {
+                        effective_defs.insert(def.to_owned());
                     }
                 }
-                (
-                    Token::Word("ifdef")
-                    | Token::Word("endif")
-                    | Token::Word("else")
-                    | Token::Word("if")
-                    | Token::Word("version"),
-                    ..,
-                ) => continue,
-                // def / def delmited
-                (Token::Word(..) | Token::Paren('{'), ..) => {
-                    let name;
-                    if lexer.skip(Token::Paren('{')) {
-                        name = self.get_next_word(&mut lexer, offset)?;
 
-                        match lexer.next() {
-                            (Token::Paren('}'), ..) => {}
-                            (tok, span) => {
-                                return Err(ComposerErrorInner::UnexpectedTokenInShaderDirective {
-                                    pos: span.to_range().unwrap().start,
-                                    expected: "}".to_string(),
-                                    found: TokenDisplay(tok).to_string(),
-                                })
+                match lexer.peek() {
+                    // import def
+                    (Token::Word("import"), ..) => {
+                        let _ = lexer.next();
+
+                        parse_imports(&mut lexer, &mut declared_imports).map_err(
+                            |(err, line_offset)| {
+                                ComposerErrorInner::ImportParseError(err.to_owned(), line_offset)
+                            },
+                        )?;
+
+                        continue;
+                    }
+                    // import path def
+                    (Token::Word("define_import_path"), ..) => {
+                        let _ = lexer.next();
+
+                        name = self
+                            .get_next_word(&mut lexer, offset)
+                            .ok()
+                            .map(|f| f.to_string());
+
+                        continue;
+                    }
+                    // define shader def
+                    (Token::Word("define"), ..) => {
+                        let _ = lexer.next();
+
+                        if allow_defines {
+                            let name = self.get_next_word(&mut lexer, offset)?;
+                            let val = self.get_shader_def_value_string(&mut lexer, offset);
+
+                            let value = if let Ok(val) = val {
+                                if let Ok(val) = val.as_str().parse::<u64>() {
+                                    ShaderDefValue::UInt(val)
+                                } else if let Ok(val) = val.as_str().parse::<i64>() {
+                                    ShaderDefValue::Int(val)
+                                } else if let Ok(val) = val.as_str().parse::<bool>() {
+                                    ShaderDefValue::Bool(val)
+                                } else {
+                                    ShaderDefValue::Bool(false) // this error will get picked up when we fully preprocess the module
+                                }
+                            } else {
+                                ShaderDefValue::Bool(true)
+                            };
+
+                            defines.insert(name.to_string(), value);
+                        } else {
+                            return Err(ComposerErrorInner::DefineInModule(offset));
+                        }
+                        continue;
+                    }
+                    (
+                        Token::Word("ifdef")
+                        | Token::Word("endif")
+                        | Token::Word("else")
+                        | Token::Word("if")
+                        | Token::Word("version"),
+                        ..,
+                    ) => continue,
+                    // def / def delmited
+                    (Token::Word(..) | Token::Paren('{'), ..) => {
+                        let name;
+                        if lexer.skip(Token::Paren('{')) {
+                            name = self.get_next_word(&mut lexer, offset)?;
+
+                            match lexer.next() {
+                                (Token::Paren('}'), ..) => {}
+                                (tok, span) => {
+                                    return Err(
+                                        ComposerErrorInner::UnexpectedTokenInShaderDirective {
+                                            pos: span.to_range().unwrap().start,
+                                            expected: "}".to_string(),
+                                            found: TokenDisplay(tok).to_string(),
+                                        },
+                                    )
+                                }
+                            }
+                        } else {
+                            name = self.get_next_word(&mut lexer, offset)?;
+                        }
+
+                        effective_defs.insert(name.to_string());
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
+            // this is `substitute_identifiers`` but it has to be done here as it no longer does it per-line
+            // and also shouldnt consume all tokens in the lexer
+            match token {
+                Token::Word(ident) => {
+                    if in_substitution_position {
+                        let path = self.try_parse_path(&mut lexer)?;
+
+                        if let Some(segments) = path {
+                            let first = segments.first().unwrap_or(&ident).to_string();
+                            let rest = segments.get(1..).unwrap_or(&[]);
+
+                            let full_paths =
+                                declared_imports.get(&first).cloned().unwrap_or(vec![first]);
+
+                            for mut full_path in full_paths {
+                                if !rest.is_empty() {
+                                    full_path.push_str("::");
+                                    full_path.push_str(&rest.join("::"));
+                                }
+
+                                if let Some((module, item)) = full_path.rsplit_once("::") {
+                                    let pos = token_span.to_range().unwrap().start;
+
+                                    used_imports
+                                        .entry(module.to_owned())
+                                        .or_insert_with(|| ImportDefWithOffset {
+                                            definition: ImportDefinition {
+                                                import: module.to_owned(),
+                                                ..Default::default()
+                                            },
+                                            offset: pos,
+                                        })
+                                        .definition
+                                        .items
+                                        .push(item.to_owned());
+                                }
                             }
                         }
                     } else {
-                        name = self.get_next_word(&mut lexer, offset)?;
+                        let _ = lexer.next();
                     }
+                }
+                Token::Separator('.') | Token::Attribute => {
+                    let _ = lexer.next();
 
-                    effective_defs.insert(name.to_string());
+                    in_substitution_position = false;
+                    continue;
                 }
                 _ => {
-                    substitute_identifiers(
-                        &mut lexer,
-                        offset,
-                        &declared_imports,
-                        &mut used_imports,
-                        true,
-                    )
-                    .unwrap();
-
-                    // the function will have consumed the rest of the tokens
-                    break;
+                    let _ = lexer.next();
                 }
             }
+
+            in_substitution_position = true;
         }
-
-        //     } else {
-        //         for cap in self
-        //             .def_regex
-        //             .captures_iter(&line)
-        //             .chain(self.def_regex_delimited.captures_iter(&line))
-        //         {
-        //             effective_defs.insert(cap.get(1).unwrap().as_str().to_owned());
-        //         }
-
-        //         substitute_identifiers(&line, offset, &declared_imports, &mut used_imports, true)
-        //             .unwrap();
-        //     }
-
-        //     offset += line.len() + 1;
-        // }
 
         Ok(PreprocessorMetaData {
             name,

@@ -52,7 +52,7 @@ fn parse_string<'a>(lexer: &mut Lexer<'a>) -> (String, &'a str, usize) {
 // not sure if thats going to be a probel
 pub fn parse_imports<'a>(
     // input: &'a str,
-    lexer: Lexer<'a>,
+    lexer: &mut Lexer<'a>,
     declared_imports: &mut IndexMap<String, Vec<String>>,
 ) -> Result<(), (&'a str, usize)> {
     let mut lexer = lexer;
@@ -108,11 +108,11 @@ pub fn parse_imports<'a>(
             }
             Token::Unknown('"') => {
                 is_in_path = false;
-                let (path, source_rest, so) = parse_string(&mut lexer);
+                let (path, source_rest, so) = parse_string(lexer);
 
                 span_offset = so;
 
-                lexer = Lexer::new(source_rest);
+                *lexer = Lexer::new(source_rest);
 
                 if stack.last().is_none() {
                     stack.push(vec![]);
@@ -205,8 +205,6 @@ pub fn parse_imports<'a>(
                     .entry(item_name)
                     .or_default()
                     .push(stack_top.join("::"));
-
-                dbg!(&declared_imports);
 
                 match t {
                     Token::Paren('}') => {
@@ -342,15 +340,13 @@ pub fn substitute_identifiers(
         in_substitution_position = true;
     }
 
-    dbg!(&output);
-
     Ok(output)
 }
 
 #[cfg(test)]
 fn test_parse(input: &str) -> Result<IndexMap<String, Vec<String>>, (&str, usize)> {
     let mut declared_imports = IndexMap::default();
-    parse_imports(Lexer::new(input), &mut declared_imports)?;
+    parse_imports(&mut Lexer::new(input), &mut declared_imports)?;
     Ok(declared_imports)
 }
 
